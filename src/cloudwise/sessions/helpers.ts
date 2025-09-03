@@ -7,6 +7,7 @@ import { parse_cdr, parse_eves, parse_location } from "../helpers";
 import { ChargingState, ClosestUpdatedLocationResult, GetDistanceMetersOptions, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { SessionCommandSettings } from "../api/types";
 import { set_document, sleep } from "akeyless-server-commons/helpers";
+import { retry } from "../helpers/retry";
 
 /// ------------------ get locations by geo and status ------------------
 export const get_distance_meters = ({ lat1, lat2, lng1, lng2 }: GetDistanceMetersOptions): number => {
@@ -20,7 +21,7 @@ export const get_distance_meters = ({ lat1, lat2, lng1, lng2 }: GetDistanceMeter
 const get_locations_by_geo_and_status = async ({
     lat,
     lng,
-    radius_in_meters = 500,
+    radius_in_meters,
     status = "BLOCKED",
 }: GetLocationsByGeoAndStatusOptions): Promise<ParsedOcpiLocationData[]> => {
     const locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("cloudwise-locations");
@@ -33,46 +34,48 @@ const get_locations_by_geo_and_status = async ({
         });
         return distance <= radius_in_meters;
     });
-
-    const result = await Promise.all(
-        locations_data.map(async (location) => {
-            const location_details = await get_location_details(location.id, { party_id: location.party_id });
-            const parsed_location = parse_location(location_details.Location);
-            const parsed_evses = location_details.Evses.map(parse_eves);
-            return {
-                ...parsed_location,
-                stations: parsed_evses,
-                company_name: location.company_name,
-                party_id: location.party_id,
-            };
-        })
-    );
+    logger.log(`get_locations_by_geo_and_status: found ${locations_data.length} locations within ${radius_in_meters} meters`);
+    const result: ParsedOcpiLocationData[] = [];
+    for (const location of locations_data) {
+        const location_details = await get_location_details(location.original_id, { party_id: location.party_id });
+        const parsed_location = parse_location(location_details.Location);
+        const parsed_evses = location_details.Evses.map(parse_eves);
+        result.push({
+            ...parsed_location,
+            stations: parsed_evses,
+            company_name: location.company_name,
+            party_id: location.party_id,
+            original_id: location.original_id,
+        });
+    }
     return result.filter((location) => location.stations.some((station) => station.status === status));
 };
 
 /// ------------------ start session helpers------------------
-const get_session_connector = (connectors: ParsedConnectorData[]): ParsedConnectorData => {
-    if (connectors.length === 1) {
-        return connectors[0];
-    } else {
-        return connectors.find((connector) => connector.standard !== "CHADEMO") || connectors[0];
-    }
-};
-
 const get_closest_updated_location = (
     locations: ParsedOcpiLocationData[],
     timestamp: Timestamp,
     status: EvseStatus = "BLOCKED"
 ): ClosestUpdatedLocationResult => {
+    const { minimum_time_difference_of_plugin_in_seconds } = get_config();
+    const threshold_ms = minimum_time_difference_of_plugin_in_seconds * 1000;
     let closestDiff = Number.POSITIVE_INFINITY;
     let closestResult: ClosestUpdatedLocationResult | null = null;
+
+    const get_session_connector = (connectors: ParsedConnectorData[]): ParsedConnectorData => {
+        if (connectors.length === 1) {
+            return connectors[0];
+        } else {
+            return connectors.find((connector) => connector.standard !== "CHADEMO") || connectors[0];
+        }
+    };
 
     locations.forEach((location) => {
         location.stations
             .filter((station) => station.status === status)
             .forEach((station) => {
                 const diff = Math.abs(timestamp.toMillis() - station.last_updated.toMillis());
-                if (diff < closestDiff) {
+                if (diff <= threshold_ms && diff < closestDiff) {
                     closestDiff = diff;
                     closestResult = {
                         location,
@@ -83,50 +86,38 @@ const get_closest_updated_location = (
                 }
             });
     });
-
     if (!closestResult) {
-        const firstLocation = locations[0];
-        const firstStation = firstLocation.stations[0];
-        return {
-            location: firstLocation,
-            station: firstStation,
-            last_updated: moment(firstStation.last_updated.toDate()).format("YYYY-MM-DD HH:mm:ss"),
-            connector: get_session_connector(firstStation.connectors),
-        };
+        throw new Error("No closest updated location found");
     }
-
     return closestResult;
 };
 
 const get_start_session_settings = async (charging_state_object: ChargingState): Promise<SessionCommandSettings> => {
-    const { lat, lng, timestamp, car_number } = charging_state_object;
-    await sleep(3000);
-    let data: ParsedOcpiLocationData[] = [];
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        data = await get_locations_by_geo_and_status({
+    const { lat, lng, timestamp } = charging_state_object;
+    let { radius_in_meters } = get_config();
+
+    const request = async () =>
+        await get_locations_by_geo_and_status({
             lat,
             lng,
-            status: "BLOCKED",
+            radius_in_meters,
         });
 
-        if (data.length > 0) {
-            break;
-        }
-
-        if (attempt < 3) {
-            await sleep(10000);
-        }
-    }
-
-    if (data.length === 0) {
-        throw new Error("No locations found after 3 attempts");
-    }
+    const data: ParsedOcpiLocationData[] = await retry(request, {
+        debug: true,
+        retries: 3,
+        throw_if_empty_result: true,
+        delay: 10,
+        on_retry_fn: () => {
+            radius_in_meters += 50;
+        },
+    });
 
     const {
         location: { party_id, id: location_id },
         station: { uid: station_uid },
         connector: { id: connector_id },
-    } = get_closest_updated_location(data, timestamp, "BLOCKED");
+    } = get_closest_updated_location(data, timestamp);
 
     const { asset_id, ble_id, device_id } = get_config();
     const command_options: SessionCommandSettings = {
@@ -143,13 +134,14 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
 };
 
 /// ------------------ start session ------------------
-// TODO: remove interval after testing
 export const start_session = async (charging_state_object: ChargingState) => {
     const { car_number } = charging_state_object;
     logger.log(`Starting session for car: "${car_number}" ...`);
     try {
+        await sleep(8000);
         const command_settings = await get_start_session_settings(charging_state_object);
-        const start_session_response = await session_command(command_settings);
+        const request = async () => await session_command(command_settings);
+        const start_session_response = await retry(request, { retries: 3, delay: 30, debug: true });
         const { CommandId: session_id } = start_session_response;
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         if (!session_id) {
@@ -185,8 +177,8 @@ export const start_session = async (charging_state_object: ChargingState) => {
 };
 
 /// ------------------ end session ------------------
-export const stop_session = async (session_id: string) => {
-    logger.log(`Stopping session: "${session_id}" ...`);
+export const stop_session = async (session_id: string, reason: string) => {
+    logger.log(`Stopping session: "${session_id}" with reason: "${reason}" ...`);
     try {
         const sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions");
         const session = sessions.find((session) => session.id === session_id);
@@ -202,7 +194,8 @@ export const stop_session = async (session_id: string) => {
         delete config.status;
         delete config.car_number;
         delete config.id;
-        await session_command(config);
+        const request = async () => await session_command(config);
+        await retry(request, { retries: 3, delay: 30, debug: true });
         logger.log(`🔵 Session "${session_id}" stopped`);
 
         /// update session status
@@ -254,7 +247,8 @@ export const handle_active_session = async (session_id: string) => {
     const run = async () => {
         const { asset_id, ble_id, device_id } = get_config();
         try {
-            const { CommandStatus } = await get_session_status({ asset_id, ble_id, session_id, device_id });
+            const request = async () => await get_session_status({ asset_id, ble_id, session_id, device_id });
+            const { CommandStatus } = await retry(request, { retries: 3, delay: 30, debug: true });
             if (CommandStatus.includes("ACTIVE")) {
                 timer = setTimeout(run, 30 * 1000);
             } else {
@@ -265,12 +259,12 @@ export const handle_active_session = async (session_id: string) => {
                     const sessions = cache_manager.getArrayData("cloudwise-sessions");
                     const session = sessions.find((session) => session.id === session_id);
                     if (session && session.status !== "completed") {
-                        await stop_session(session_id);
+                        await stop_session(session_id, `Session status is: ${CommandStatus}`);
                     }
                 }, 10 * 1000);
             }
         } catch (error) {
-            logger.error("🔴 Error in handle_active_session", error);
+            logger.error("🔴 Error in handle_active_session: cannot get session status", error);
             if (timer) {
                 clearTimeout(timer);
             }
@@ -281,14 +275,18 @@ export const handle_active_session = async (session_id: string) => {
             }
         }
     };
-
-    await run();
+    try {
+        await run();
+    } catch (error) {
+        logger.error("🔴 Error in handle_active_session: cannot run the interval", error);
+    }
 };
 
 /// ------------------ handle charging state add and edit ------------------
 const handle_status_change = async (charging_state_object: ChargingState) => {
     const { status, car_number } = charging_state_object;
-    if (!["1234567890", "20326304", "86913103"].includes(car_number)) {
+    const { allowed_cars } = get_config();
+    if (!allowed_cars.includes(car_number)) {
         return;
     }
     switch (status) {
@@ -298,11 +296,11 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
         case "charging":
             await handle_active_session(charging_state_object.session_id!);
             break;
-        case "plugout":
+        // case "plugout":
         case "error":
             if (charging_state_object.session_id?.length) {
                 logger.warn(`🔴 Stopping session from status snapshot ...  `);
-                await stop_session(charging_state_object.session_id);
+                await stop_session(charging_state_object.session_id, "error in session status");
             }
             break;
 
@@ -316,12 +314,18 @@ export const handle_charging_state_add_and_edit = (data: ChargingState[]) => {
     data.forEach((new_car) => {
         const old_car = prev.find((old) => old.car_number === new_car.car_number);
         if (!old_car) {
+            logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
             handle_status_change(new_car);
             prev = [...prev, new_car];
             return;
         }
-
-        if (new_car.status !== old_car.status) {
+        const [old_status, new_status] = [old_car.status, new_car.status];
+        if (old_status !== new_status) {
+            if (old_status === "charging" && new_status === "plugin") {
+                logger.warn(`🟡 get status change from charging to plugin, skipping ...`);
+                return;
+            }
+            logger.log(`♻️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
             handle_status_change(new_car);
         }
         prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));

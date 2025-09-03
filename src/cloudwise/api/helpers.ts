@@ -28,31 +28,44 @@ export const get_config = (): CloudwiseConfig => {
     return config;
 };
 
-export const cloudwise_request = async <T = any>(endpoint: string, payload: Record<string, any>): Promise<T> => {
-    const { base_url, token } = get_config();
-
-    const response = await axios.post(`${base_url}/${endpoint}`, {
-        FirebaseToken: token,
-        ...payload,
-    });
-    const data = response.data || {};
-    const { ErrorCode } = data;
-    if (ErrorCode && ErrorCode > 0) {
-        throw new Error(data);
+export const cloudwise_request = async <T = any>(endpoint: string, payload: Record<string, any>, timeout_in_sec?: number): Promise<T> => {
+    const now = new Date().getTime();
+    try {
+        const { base_url, token } = get_config();
+        const response = await axios.post(
+            `${base_url}/${endpoint}`,
+            {
+                FirebaseToken: token,
+                ...payload,
+            },
+            { timeout: (timeout_in_sec ?? 30) * 1000 }
+        );
+        const data = response.data || {};
+        const { ErrorCode } = data;
+        if (ErrorCode && ErrorCode > 0) {
+            throw new Error(data);
+        }
+        return data as T;
+    } catch (error) {
+        const duration = new Date().getTime() - now;
+        logger.error(`❌ cloudwise_request error: "${endpoint}" (${duration}ms), payload: ${JSON.stringify(payload)}`, error);
+        throw error;
     }
-
-    return data as T;
 };
 
 export const login = async (): Promise<string> => {
     try {
         const { login_key, email, password } = get_config();
         const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${login_key}`;
-        const response = await axios.post(url, {
-            email,
-            password,
-            returnSecureToken: true,
-        });
+        const response = await axios.post(
+            url,
+            {
+                email,
+                password,
+                returnSecureToken: true,
+            },
+            { timeout: 30 * 1000 }
+        );
         const token = response.data.idToken;
         cache_manager.setObjectData("cloudwise-token", { value: token });
         return token;
@@ -81,7 +94,6 @@ export const get_location_details = async (
     options: GetLocationDetailsOptions
 ): Promise<GetLocationDetailsResponse["Location"]> => {
     const { party_id, country_code = "IL" } = options;
-
     const { Location } = await cloudwise_request<GetLocationDetailsResponse>("getLocationDetails", {
         LocationId: locationId,
         PartyID: party_id,
@@ -150,4 +162,13 @@ export const get_user_cdrs = async (options: UserCdrsOptions): Promise<UserCdrsR
     });
 
     return data.Items;
+};
+
+const test_request = async () => {
+    try {
+        await axios.get(`https://akeyless-sys.com`);
+        logger.log("✅ test_request success");
+    } catch (error) {
+        logger.error("❌ test_request error", error);
+    }
 };

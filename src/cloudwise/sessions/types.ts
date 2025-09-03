@@ -26,7 +26,7 @@ export interface GetDistanceMetersOptions {
 export interface GetLocationsByGeoAndStatusOptions {
     lat: number;
     lng: number;
-    radius_in_meters?: number;
+    radius_in_meters: number;
     status?: EvseStatus;
 }
 

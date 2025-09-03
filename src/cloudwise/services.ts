@@ -7,26 +7,31 @@ import { ParsedOcpiLocationData } from "./types";
 import { get_distance_meters, stop_session as stop_session_helper } from "./sessions/helpers";
 
 export const get_location_status: Service = async (req, res) => {
-    const { id } = req.params;
+    const { original_id } = req.params;
     try {
-        const location: ParsedOcpiLocationData | undefined = cache_manager.getArrayData("cloudwise-locations").find((v) => v.id === id);
+        const location: ParsedOcpiLocationData | undefined = cache_manager
+            .getArrayData("cloudwise-locations")
+            .find((v) => v.original_id === original_id);
         if (!location) {
             throw new Error("Location not found");
         }
-        const location_details = await get_location_details(id, { party_id: location.party_id });
+        const location_details = await get_location_details(original_id, { party_id: location.party_id });
+        if (!location_details?.Location) {
+            throw new Error("Location details not found");
+        }
         const parsed_location = parse_location(location_details.Location);
         const parsed_evses = location_details.Evses.map(parse_eves);
         res.json(json_ok({ ...parsed_location, stations: parsed_evses }));
     } catch (error) {
         res.json(json_failed(error));
-        logger.error(`Error in get_location_status, location id: ${id}`, error);
+        logger.error(`Error in get_location_status, location id: ${original_id}`, error);
     }
 };
 
 export const stop_session: Service = async (req, res) => {
     const { session_id } = req.body;
     try {
-        await stop_session_helper(session_id);
+        await stop_session_helper(session_id, "API call");
         res.json(json_ok({ message: "Session stopped" }));
     } catch (error) {
         res.json(json_failed(error));

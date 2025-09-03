@@ -39,8 +39,11 @@ export const parse_location = (location: Location): ParsedLocationData => {
 export const parse_ocpi_location = (location: OcpiLocation): ParsedOcpiLocationData => {
     const { OcpiEvses: ocpi_evses, CompanyName: company_name, PartyId: party_id } = location;
     const ocpi_evses_data = ocpi_evses.map(parse_ocpi_eves);
+    const loc = parse_location(location);
     const res: ParsedOcpiLocationData = {
-        ...parse_location(location),
+        ...loc,
+        id: `${loc.id}-${party_id}-${loc.country}`,
+        original_id: loc.id,
         company_name,
         party_id,
         stations: ocpi_evses_data,
