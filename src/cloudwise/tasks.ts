@@ -7,17 +7,19 @@ import { get_config, get_locations, get_user_cdrs, login } from "./api/helpers";
 import { ChargingSession } from "./sessions/types";
 
 export const run_tasks = async () => {
+    const hour = 60 * 60 * 1000;
     /// login
-    setInterval(login, 2 * 60 * 60 * 1000);
+    setInterval(login, 2 * hour);
     /// collect locations
-    await execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
+    execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
     setInterval(() => {
         execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
-    }, 12 * 60 * 60 * 1000);
+    }, 12 * hour);
     /// collect cdrs
+    execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
     setInterval(() => {
         execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
-    }, 60 * 60 * 1000);
+    }, hour);
 };
 
 export const task__collect_cloudwise_locations = async () => {
@@ -52,7 +54,8 @@ export const task__collect_cloudwise_cdrs = async () => {
     const cached_sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions").filter((session: ChargingSession) => {
         return session.status === "completed" && !session.cdr_id;
     });
-    logger.log(`Found ${cached_sessions.length} completed sessions without cdr`);
+    logger.log(`🔍 Found ${cached_sessions.length} completed sessions without CDR`);
+    const debug_result: any[] = [];
     if (cached_sessions.length) {
         const batch = db.batch();
         cached_sessions.forEach((session) => {
@@ -68,10 +71,11 @@ export const task__collect_cloudwise_cdrs = async () => {
                 if (cdr_id) {
                     batch.set(db.collection("cloudwise-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
                     batch.set(db.collection("cloudwise-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, timestamp: session.timestamp });
+                    debug_result.push({ session_id, cdr_id });
                 }
             }
         });
         await batch.commit();
-        logger.log(`Updated ${cached_sessions.length} sessions with cdr`);
+        logger.log(`✔️ updated ${debug_result.length} sessions CDR's`);
     }
 };

@@ -35,12 +35,12 @@ const get_locations_by_geo_and_status = async ({
         return distance <= radius_in_meters;
     });
     logger.log(`get_locations_by_geo_and_status: found ${locations_data.length} locations within ${radius_in_meters} meters`);
-    const result: ParsedOcpiLocationData[] = [];
+    const ocpi_locations: ParsedOcpiLocationData[] = [];
     for (const location of locations_data) {
         const location_details = await get_location_details(location.original_id, { party_id: location.party_id });
         const parsed_location = parse_location(location_details.Location);
         const parsed_evses = location_details.Evses.map(parse_eves);
-        result.push({
+        ocpi_locations.push({
             ...parsed_location,
             stations: parsed_evses,
             company_name: location.company_name,
@@ -48,7 +48,9 @@ const get_locations_by_geo_and_status = async ({
             original_id: location.original_id,
         });
     }
-    return result.filter((location) => location.stations.some((station) => station.status === status));
+    const result = ocpi_locations.filter((location) => location.stations.some((station) => station.status === status));
+    logger.log(`get_locations_by_geo_and_status: found ${result.length} locations with status: ${status}`);
+    return result;
 };
 
 /// ------------------ start session helpers------------------
@@ -311,10 +313,13 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
 
 export const handle_charging_state_add_and_edit = (data: ChargingState[]) => {
     let prev: ChargingState[] = cache_manager.getArrayData("cloudwise-charging-state");
+    const { allowed_cars } = get_config();
     data.forEach((new_car) => {
         const old_car = prev.find((old) => old.car_number === new_car.car_number);
         if (!old_car) {
-            logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
+            if (allowed_cars.includes(new_car.car_number)) {
+                logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
+            }
             handle_status_change(new_car);
             prev = [...prev, new_car];
             return;
@@ -325,7 +330,9 @@ export const handle_charging_state_add_and_edit = (data: ChargingState[]) => {
                 logger.warn(`🟡 get status change from charging to plugin, skipping ...`);
                 return;
             }
-            logger.log(`♻️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
+            if (allowed_cars.includes(new_car.car_number)) {
+                logger.log(`♻️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
+            }
             handle_status_change(new_car);
         }
         prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));
