@@ -11,6 +11,9 @@ export type CloudwiseConfig = {
     device_id: string;
     ble_id: string;
     asset_id: string;
+    allowed_cars: string[];
+    minimum_time_difference_of_plugin_in_seconds: number;
+    radius_in_meters: number;
 };
 
 export interface CloudwiseResponse {
