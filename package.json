@@ -1,6 +1,6 @@
 {
     "name": "nx-cloudwise",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "responsible for all akeyless cache-server",
     "main": "index.js",
     "scripts": {
@@ -19,7 +19,7 @@
     },
     "dependencies": {
         "@avto-dev/vehicle-logotypes": "^2.10.0",
-        "akeyless-server-commons": "^1.0.120",
+        "akeyless-server-commons": "^1.0.125",
         "akeyless-types-commons": "^1.0.45",
         "axios": "^1.6.8",
         "express": "^4.19.2",

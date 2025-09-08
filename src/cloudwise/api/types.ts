@@ -2,18 +2,19 @@ import { TObject } from "akeyless-types-commons";
 import { CdrItem, Evse, Location, OcpiLocation } from "../types";
 import { CommandStatus } from "../sessions/types";
 
-export type CloudwiseConfig =
-    | {
-          base_url: string;
-          email: string;
-          password: string;
-          login_key: string;
-          token: string;
-          device_id: string;
-          ble_id: string;
-          asset_id: string;
-      }
-    | TObject<string>;
+export type CloudwiseConfig = {
+    base_url: string;
+    email: string;
+    password: string;
+    login_key: string;
+    token: string;
+    device_id: string;
+    ble_id: string;
+    asset_id: string;
+    allowed_cars: string[];
+    minimum_time_difference_of_plugin_in_seconds: number;
+    radius_in_meters: number;
+};
 
 export interface CloudwiseResponse {
     ErrorCode: number;

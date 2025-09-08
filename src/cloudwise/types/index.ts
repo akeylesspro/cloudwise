@@ -160,6 +160,7 @@ export interface ParsedLocationData {
 }
 
 export interface ParsedOcpiLocationData extends ParsedLocationData {
+    original_id: string;
     company_name: string;
     party_id: string;
     stations: ParsedEvseData[];

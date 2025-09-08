@@ -7,19 +7,19 @@ import { get_config, get_locations, get_user_cdrs, login } from "./api/helpers";
 import { ChargingSession } from "./sessions/types";
 
 export const run_tasks = async () => {
+    const hour = 60 * 60 * 1000;
     /// login
-    setInterval(login, 2 * 60 * 60 * 1000);
-
+    setInterval(login, 2 * hour);
     /// collect locations
-    await execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
+    execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
     setInterval(() => {
         execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
-    }, 30 * 60 * 1000);
-
+    }, 12 * hour);
     /// collect cdrs
+    execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
     setInterval(() => {
         execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
-    }, 60 * 60 * 1000);
+    }, 5 * 60 * 1000);
 };
 
 export const task__collect_cloudwise_locations = async () => {
@@ -38,7 +38,9 @@ export const task__collect_cloudwise_locations = async () => {
     if (need_to_update.length) {
         const batch = db.batch();
         need_to_update.forEach((loc) => {
-            batch.set(db.collection("cloudwise-locations").doc(loc.id), loc);
+            const clone: any = { ...loc };
+            delete clone.id;
+            batch.set(db.collection("cloudwise-locations").doc(loc.id), clone);
         });
         await batch.commit();
         logger.log(`Updated ${need_to_update.length} locations`);
@@ -52,19 +54,28 @@ export const task__collect_cloudwise_cdrs = async () => {
     const cached_sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions").filter((session: ChargingSession) => {
         return session.status === "completed" && !session.cdr_id;
     });
+    logger.log(`🔍 Found ${cached_sessions.length} completed sessions without CDR`);
+    const debug_result: any[] = [];
     if (cached_sessions.length) {
         const batch = db.batch();
         cached_sessions.forEach((session) => {
+            if (!session.id) {
+                return;
+            }
             const session_id = session.id;
             delete session.id;
             const cdr = parsed_cdrs.find((cdr) => cdr.session_id === session_id);
             if (cdr) {
                 const cdr_id = cdr.id;
                 delete cdr.id;
-                batch.set(db.collection("cloudwise-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
-                batch.set(db.collection("cloudwise-cdrs").doc(cdr_id!), { ...cdr, car_number: session.car_number, timestamp: session.timestamp });
+                if (cdr_id) {
+                    batch.set(db.collection("cloudwise-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
+                    batch.set(db.collection("cloudwise-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, nx_updated: session.updated });
+                    debug_result.push({ session_id, cdr_id });
+                }
             }
         });
         await batch.commit();
+        logger.log(`✔️ updated ${debug_result.length} sessions CDRs`);
     }
 };
