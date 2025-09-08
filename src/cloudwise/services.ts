@@ -51,6 +51,7 @@ export const get_cdrs: Service = async (req, res) => {
 };
 interface GetLocationsOptions {
     limit?: number;
+    id?: string;
     offset?: number;
     radius?: number;
     lat?: number;
@@ -58,11 +59,14 @@ interface GetLocationsOptions {
     operator_name?: string;
 }
 export const get_locations: Service = async (req, res) => {
-    const { limit = 9999, offset = 0, radius = 1000 * 10, lat, lng, operator_name } = req.body as GetLocationsOptions;
+    const { limit = 9999, offset = 0, radius = 1000 * 10, lat, lng, operator_name, id } = req.body as GetLocationsOptions;
     try {
         let locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("cloudwise-locations");
         if (operator_name) {
             locations = locations.filter((location) => location.company_name.toLowerCase() === operator_name.toLowerCase());
+        }
+        if (id) {
+            locations = locations.filter((location) => location.id === id);
         }
         if (lat && lng) {
             locations = locations.filter((location) => {

@@ -173,7 +173,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
         //     console.log("get_session_status", res);
         // }, 5 * 1000);
     } catch (error) {
-        logger.error("🔴 Error in send_command_helper", error);
+        logger.error("🔴 Error in start_session", error);
         await set_document("cloudwise-charging-state", car_number, { ...charging_state_object, status: "error", timestamp: Timestamp.now() });
     }
 };
