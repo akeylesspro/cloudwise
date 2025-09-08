@@ -13,7 +13,7 @@ router.get("/v", (req, res) => {
     res.send(`${package_json.version} --${process.env.mode === "qa" ? "QA" : "PROD"}`);
 });
 
-router.get("/locations/status/:original_id", nx_user_login, get_location_status);
+router.get("/locations/status", nx_user_login, get_location_status);
 
 router.post("/locations/get", nx_user_login, get_locations);
 

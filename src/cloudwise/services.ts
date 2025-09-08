@@ -5,13 +5,14 @@ import { get_cdrs as get_cdrs_helper, parse_eves, parse_location } from "./helpe
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { ParsedOcpiLocationData } from "./types";
 import { get_distance_meters, stop_session as stop_session_helper } from "./sessions/helpers";
+import { TObject } from "akeyless-types-commons";
 
 export const get_location_status: Service = async (req, res) => {
-    const { original_id } = req.params;
+    const { original_id, party_id } = req.query as TObject<string>;
     try {
         const location: ParsedOcpiLocationData | undefined = cache_manager
             .getArrayData("cloudwise-locations")
-            .find((v) => v.original_id === original_id);
+            .find((v) => v.original_id === original_id && v.party_id === party_id);
         if (!location) {
             throw new Error("Location not found");
         }

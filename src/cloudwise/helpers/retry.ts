@@ -4,6 +4,10 @@ import { logger } from "akeyless-server-commons/managers";
 type RetryOptions = {
     retries?: number;
     delay?: number;
+    random_delay?: {
+        min: number;
+        max: number;
+    };
     delays?: number[];
     delay_fn?: (attempt: number, retries: number, last_error?: any) => number;
     on_retry_fn?: (attempt: number, retries: number, last_error?: any) => void;
@@ -18,6 +22,7 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
         // delay options
         delay = 10,
         delays = [],
+        random_delay,
         delay_fn,
         // retry options
         retries = 3,
@@ -61,7 +66,9 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
             on_retry_fn?.(attempt, retries, last_error);
 
             let delay_seconds = delay;
-            if (typeof delay_fn === "function") {
+            if (random_delay) {
+                delay_seconds = get_random_number_between(random_delay.min, random_delay.max);
+            } else if (typeof delay_fn === "function") {
                 delay_seconds = delay_fn(attempt, retries, last_error);
             } else if (delays.length >= attempt) {
                 delay_seconds = delays[attempt - 1];
@@ -77,4 +84,8 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
     }
 
     throw last_error;
+};
+
+export const get_random_number_between = (min: number, max: number): number => {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
 };

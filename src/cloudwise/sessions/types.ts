@@ -40,9 +40,9 @@ export interface ClosestUpdatedLocationResult {
 export interface ChargingSession extends Omit<SessionCommandSettings, "command"> {
     id?: string;
     car_number: string;
-    timestamp: Timestamp;
-    start_timestamp: Timestamp;
-    end_timestamp?: Timestamp;
+    updated: Timestamp;
+    started: Timestamp;
+    ended?: Timestamp;
     status: "started" | "completed" | "error";
     cdr_id?: string;
 }

@@ -89,7 +89,7 @@ const get_closest_updated_location = (
             });
     });
     if (!closestResult) {
-        throw new Error("No closest updated location found");
+        throw new Error(`No closest updated location found, ms: ${timestamp.toMillis()}, locations: ${JSON.stringify(locations)} `);
     }
     return closestResult;
 };
@@ -143,7 +143,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
         await sleep(8000);
         const command_settings = await get_start_session_settings(charging_state_object);
         const request = async () => await session_command(command_settings);
-        const start_session_response = await retry(request, { retries: 3, delay: 30, debug: true });
+        const start_session_response = await retry(request, { retries: 3, random_delay: { min: 3, max: 5 }, debug: true });
         const { CommandId: session_id } = start_session_response;
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         if (!session_id) {
@@ -155,8 +155,8 @@ export const start_session = async (charging_state_object: ChargingState) => {
             ...command_settings,
             car_number,
             status: "started",
-            start_timestamp: Timestamp.now(),
-            timestamp: Timestamp.now(),
+            started: Timestamp.now(),
+            updated: Timestamp.now(),
         };
         await set_document("cloudwise-sessions", session_id, session);
         await set_document("cloudwise-charging-state", car_number, {
@@ -191,7 +191,7 @@ export const stop_session = async (session_id: string, reason: string) => {
             ...session,
             command: "STOP_SESSION",
             session_id: session.id,
-            timestamp: Timestamp.now(),
+            updated: Timestamp.now(),
         };
         delete config.status;
         delete config.car_number;
@@ -204,8 +204,8 @@ export const stop_session = async (session_id: string, reason: string) => {
         await set_document("cloudwise-sessions", session_id, {
             ...session,
             status: "completed",
-            timestamp: Timestamp.now(),
-            end_timestamp: Timestamp.now(),
+            updated: Timestamp.now(),
+            ended: Timestamp.now(),
         });
         await set_document("cloudwise-charging-state", session.car_number, { status: "plugout", session_id: "", timestamp: Timestamp.now() });
 
@@ -232,7 +232,7 @@ export const stop_session = async (session_id: string, reason: string) => {
                         ...parsed_cdr,
                         session_id,
                         car_number: session.car_number,
-                        timestamp: Timestamp.now(),
+                        nx_updated: Timestamp.now(),
                     });
                 }
                 await set_document("cloudwise-sessions", session_id, update);
@@ -273,7 +273,7 @@ export const handle_active_session = async (session_id: string) => {
             const sessions = cache_manager.getArrayData("cloudwise-sessions");
             const session = sessions.find((session) => session.id === session_id);
             if (session) {
-                await set_document("cloudwise-sessions", session_id, { status: "error", timestamp: Timestamp.now(), end_timestamp: Timestamp.now() });
+                await set_document("cloudwise-sessions", session_id, { status: "error", updated: Timestamp.now(), ended: Timestamp.now() });
             }
         }
     };
@@ -311,10 +311,10 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
     }
 };
 
-export const handle_charging_state_add_and_edit = (data: ChargingState[]) => {
+export const handle_charging_state_add_and_edit = (charging_states: ChargingState[]) => {
     let prev: ChargingState[] = cache_manager.getArrayData("cloudwise-charging-state");
     const { allowed_cars } = get_config();
-    data.forEach((new_car) => {
+    charging_states.forEach((new_car) => {
         const old_car = prev.find((old) => old.car_number === new_car.car_number);
         if (!old_car) {
             if (allowed_cars.includes(new_car.car_number)) {

@@ -19,7 +19,7 @@ export const run_tasks = async () => {
     execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
     setInterval(() => {
         execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
-    }, hour);
+    }, 5 * 60 * 1000);
 };
 
 export const task__collect_cloudwise_locations = async () => {
@@ -70,12 +70,12 @@ export const task__collect_cloudwise_cdrs = async () => {
                 delete cdr.id;
                 if (cdr_id) {
                     batch.set(db.collection("cloudwise-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
-                    batch.set(db.collection("cloudwise-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, timestamp: session.timestamp });
+                    batch.set(db.collection("cloudwise-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, nx_updated: session.updated });
                     debug_result.push({ session_id, cdr_id });
                 }
             }
         });
         await batch.commit();
-        logger.log(`✔️ updated ${debug_result.length} sessions CDR's`);
+        logger.log(`✔️ updated ${debug_result.length} sessions CDRs`);
     }
 };
