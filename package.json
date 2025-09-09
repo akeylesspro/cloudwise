@@ -1,6 +1,6 @@
 {
     "name": "nx-cloudwise",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "responsible for all akeyless cache-server",
     "main": "index.js",
     "scripts": {
