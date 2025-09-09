@@ -220,7 +220,7 @@ export const stop_session = async (session_id: string, reason: string) => {
             } = await get_session_status({ asset_id, ble_id, session_id, device_id });
 
             if (session_status.includes("COMPLETED")) {
-                const update: any = { cost, count, kwh, charging_time_in_seconds, timestamp: Timestamp.now() };
+                const update: any = { cost, count, kwh, charging_time_in_seconds, updated: Timestamp.now() };
                 if (cdr) {
                     const parsed_cdr = parse_cdr(cdr);
                     const cdr_id = parsed_cdr.id;
