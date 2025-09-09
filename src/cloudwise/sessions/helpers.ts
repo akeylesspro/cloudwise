@@ -140,7 +140,6 @@ export const start_session = async (charging_state_object: ChargingState) => {
     const { car_number } = charging_state_object;
     logger.log(`Starting session for car: "${car_number}" ...`);
     try {
-        await sleep(8000);
         const command_settings = await get_start_session_settings(charging_state_object);
         const request = async () => await session_command(command_settings);
         const start_session_response = await retry(request, { retries: 3, random_delay: { min: 3, max: 5 }, debug: true });
@@ -197,7 +196,7 @@ export const stop_session = async (session_id: string, reason: string) => {
         delete config.id;
         const request = async () => await session_command(config);
         await retry(request, { retries: 3, delay: 30, debug: true });
-        logger.log(`🔵 Session "${session_id}" stopped`);
+        logger.log(`⛔ Session "${session_id}" stopped`);
 
         /// update session status
         await set_document("cloudwise-sessions", session_id, {
@@ -326,11 +325,11 @@ export const handle_charging_state_add_and_edit = (charging_states: ChargingStat
         const [old_status, new_status] = [old_car.status, new_car.status];
         if (old_status !== new_status) {
             if (old_status === "charging" && new_status === "plugin") {
-                logger.warn(`🟡 get status change from charging to plugin, skipping ...`);
+                logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
                 return;
             }
             if (allowed_cars.includes(new_car.car_number)) {
-                logger.log(`♻️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
+                logger.log(`ℹ️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
             }
             handle_status_change(new_car);
         }
