@@ -226,5 +226,5 @@ export interface ParsedCdrItem {
     avg_kwh_price: number;
     duration: string; // Format HH:mm:ss
     car_number?: string;
-    timestamp?: Timestamp;
+    nx_updated?: Timestamp;
 }

@@ -150,7 +150,6 @@ export const start_session = async (charging_state_object: ChargingState) => {
             throw new Error("Session id not found in start session response");
         }
         delete command_settings.command;
-        delete command_settings.party_id;
         const session: ChargingSession = {
             ...command_settings,
             car_number,

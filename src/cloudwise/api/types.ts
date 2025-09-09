@@ -14,6 +14,7 @@ export type CloudwiseConfig = {
     allowed_cars: string[];
     minimum_time_difference_of_plugin_in_seconds: number;
     radius_in_meters: number;
+    task_collect_cdr_debug: boolean;
 };
 
 export interface CloudwiseResponse {

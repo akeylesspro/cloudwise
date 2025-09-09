@@ -48,13 +48,15 @@ export const task__collect_cloudwise_locations = async () => {
 };
 
 export const task__collect_cloudwise_cdrs = async () => {
-    const { asset_id } = get_config();
+    const { asset_id, task_collect_cdr_debug } = get_config();
     const cdrs = await get_user_cdrs({ asset_id });
     const parsed_cdrs = cdrs.map(parse_cdr);
     const cached_sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions").filter((session: ChargingSession) => {
         return session.status === "completed" && !session.cdr_id;
     });
-    logger.log(`🔍 Found ${cached_sessions.length} completed sessions without CDR`);
+    if (task_collect_cdr_debug) {
+        logger.log(`🔍 Found ${cached_sessions.length} completed sessions without CDR`);
+    }
     const debug_result: any[] = [];
     if (cached_sessions.length) {
         const batch = db.batch();
@@ -76,6 +78,8 @@ export const task__collect_cloudwise_cdrs = async () => {
             }
         });
         await batch.commit();
-        logger.log(`✔️ updated ${debug_result.length} sessions CDRs`);
+        if (task_collect_cdr_debug) {
+            logger.log(`✔️ updated ${debug_result.length} sessions CDRs`);
+        }
     }
 };
