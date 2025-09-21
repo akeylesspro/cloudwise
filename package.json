@@ -1,6 +1,6 @@
 {
     "name": "nx-cloudwise",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "responsible for all akeyless cache-server",
     "main": "index.js",
     "scripts": {
@@ -19,6 +19,7 @@
     },
     "dependencies": {
         "@avto-dev/vehicle-logotypes": "^2.10.0",
+        "@types/ping": "^0.4.4",
         "akeyless-server-commons": "^1.0.125",
         "akeyless-types-commons": "^1.0.45",
         "axios": "^1.6.8",
@@ -27,6 +28,7 @@
         "moment": "^2.30.1",
         "moment-timezone": "^0.5.45",
         "node-schedule": "^2.1.1",
+        "ping": "^0.4.4",
         "uuid": "^11.1.0"
     },
     "devDependencies": {

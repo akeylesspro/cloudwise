@@ -6,7 +6,7 @@ import moment from "moment";
 import { parse_cdr, parse_eves, parse_location } from "../helpers";
 import { ChargingState, ClosestUpdatedLocationResult, GetDistanceMetersOptions, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { SessionCommandSettings } from "../api/types";
-import { set_document, sleep } from "akeyless-server-commons/helpers";
+import { set_document, sleep, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 
 /// ------------------ get locations by geo and status ------------------
@@ -89,7 +89,19 @@ const get_closest_updated_location = (
             });
     });
     if (!closestResult) {
-        throw new Error(`No closest updated location found, ms: ${timestamp.toMillis()}, locations: ${JSON.stringify(locations)} `);
+        const timestamps = locations
+            .map((location) =>
+                location.stations.map((station) => ({
+                    timestamp: timestamp_to_string(station.last_updated as any),
+                    name: location.name,
+                    location_id: location.id,
+                    station_uid: station.uid,
+                }))
+            )
+            .flat();
+        throw new Error(
+            `No closest updated location found, plugin time: ${timestamp_to_string(timestamp as any)}, locations: ${JSON.stringify(timestamps)} `
+        );
     }
     return closestResult;
 };

@@ -52,10 +52,14 @@ export const task__collect_cloudwise_cdrs = async () => {
     const cdrs = await get_user_cdrs({ asset_id });
     const parsed_cdrs = cdrs.map(parse_cdr);
     const cached_sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions").filter((session: ChargingSession) => {
-        return session.status === "completed" && !session.cdr_id;
+        return session.id && session.status === "completed" && !session.cdr_id;
     });
     if (task_collect_cdr_debug) {
         logger.log(`🔍 Found ${cached_sessions.length} completed sessions without CDR`);
+        logger.log(
+            "Sessions ids: ",
+            cached_sessions.map((session) => session.id)
+        );
     }
     const debug_result: any[] = [];
     if (cached_sessions.length) {
