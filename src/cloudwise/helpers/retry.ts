@@ -15,6 +15,7 @@ type RetryOptions = {
     debug?: boolean;
     throw_if_empty_result?: boolean;
     is_empty_result_fn?: (result: any) => boolean;
+    name?: string;
 };
 
 export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> => {
@@ -32,6 +33,7 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
         throw_if_empty_result = false,
         is_empty_result_fn,
         debug = false,
+        name = "",
     } = options || {};
 
     let last_error: any;
@@ -52,6 +54,9 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
                     empty_error.name = "EMPTY_RESULT";
                     throw empty_error;
                 }
+            }
+            if (debug) {
+                logger.log(`✅ Retry for ${name} success after ${attempt} attempts`);
             }
             return result;
         } catch (error: any) {
@@ -76,13 +81,12 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
 
             const delay_ms = delay_seconds * 1000;
 
-            if (debug) {
-                logger.warn(`Attempt ${attempt} failed with error: ${error_code}. Retrying in ${delay_ms}ms...`);
-            }
             await sleep(delay_ms);
         }
     }
-
+    if (debug) {
+        logger.error(`❌ Retry for ${name} failed after ${retries} attempts`, last_error);
+    }
     throw last_error;
 };
 

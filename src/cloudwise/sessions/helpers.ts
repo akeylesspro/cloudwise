@@ -121,12 +121,13 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
         debug: true,
         retries: 3,
         throw_if_empty_result: true,
-        delay: 10,
+        random_delay: { min: 5, max: 10 },
         on_retry_fn: () => {
             radius_in_meters += 50;
         },
+        name: "check_closest_updated_location",
     });
-
+    
     const {
         location: { party_id, id: location_id },
         station: { uid: station_uid },
@@ -154,7 +155,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
     try {
         const command_settings = await get_start_session_settings(charging_state_object);
         const request = async () => await session_command(command_settings);
-        const start_session_response = await retry(request, { retries: 3, random_delay: { min: 3, max: 5 }, debug: true });
+        const start_session_response = await retry(request, { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "start_session" });
         const { CommandId: session_id } = start_session_response;
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         if (!session_id) {
@@ -207,7 +208,7 @@ export const stop_session = async (session_id: string, reason: string) => {
         delete config.car_number;
         delete config.id;
         const request = async () => await session_command(config);
-        await retry(request, { retries: 3, delay: 30, debug: true });
+        await retry(request, { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "stop_session" });
         logger.log(`⛔ Session "${session_id}" stopped`);
 
         /// update session status
@@ -260,7 +261,12 @@ export const handle_active_session = async (session_id: string) => {
         const { asset_id, ble_id, device_id } = get_config();
         try {
             const request = async () => await get_session_status({ asset_id, ble_id, session_id, device_id });
-            const { CommandStatus } = await retry(request, { retries: 3, delay: 30, debug: true });
+            const { CommandStatus } = await retry(request, {
+                retries: 3,
+                random_delay: { min: 10, max: 20 },
+                debug: true,
+                name: "get_session_status",
+            });
             if (CommandStatus.includes("ACTIVE")) {
                 timer = setTimeout(run, 30 * 1000);
             } else {
