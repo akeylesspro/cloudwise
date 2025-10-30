@@ -13,9 +13,9 @@ router.get("/v", (req, res) => {
     res.send(`${package_json.version} --${process.env.mode === "qa" ? "QA" : "PROD"}`);
 });
 
-router.get("/locations/status", nx_user_login, get_location_status);
+router.get("/locations/status", get_location_status);
 
-router.post("/locations/get", nx_user_login, get_locations);
+router.post("/locations/get", get_locations);
 
 router.post("/sessions/stop", nx_user_login, mandatory({ body: [{ key: "session_id", type: "string", length: 3 }] }), stop_session);
 

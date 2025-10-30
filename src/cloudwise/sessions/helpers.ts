@@ -22,7 +22,7 @@ const get_locations_by_geo_and_status = async ({
     lat,
     lng,
     radius_in_meters,
-    status = "BLOCKED",
+    statuses = ["BLOCKED", "PREPARING"],
 }: GetLocationsByGeoAndStatusOptions): Promise<ParsedOcpiLocationData[]> => {
     const locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("cloudwise-locations");
     const locations_data = locations.filter((location) => {
@@ -48,8 +48,8 @@ const get_locations_by_geo_and_status = async ({
             original_id: location.original_id,
         });
     }
-    const result = ocpi_locations.filter((location) => location.stations.some((station) => station.status === status));
-    logger.log(`get_locations_by_geo_and_status: found ${result.length} locations with status: ${status}`);
+    const result = ocpi_locations.filter((location) => location.stations.some((station) => statuses.includes(station.status)));
+    logger.log(`get_locations_by_geo_and_status: found ${result.length} locations with statuses: ${statuses.join(", ")}`);
     return result;
 };
 
@@ -57,7 +57,7 @@ const get_locations_by_geo_and_status = async ({
 const get_closest_updated_location = (
     locations: ParsedOcpiLocationData[],
     timestamp: Timestamp,
-    status: EvseStatus = "BLOCKED"
+    statuses: EvseStatus[] = ["BLOCKED", "PREPARING"]
 ): ClosestUpdatedLocationResult => {
     const { minimum_time_difference_of_plugin_in_seconds } = get_config();
     const threshold_ms = minimum_time_difference_of_plugin_in_seconds * 1000;
@@ -74,7 +74,7 @@ const get_closest_updated_location = (
 
     locations.forEach((location) => {
         location.stations
-            .filter((station) => station.status === status)
+            .filter((station) => statuses.includes(station.status))
             .forEach((station) => {
                 const diff = Math.abs(timestamp.toMillis() - station.last_updated.toMillis());
                 if (diff <= threshold_ms && diff < closestDiff) {
@@ -127,7 +127,7 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
         },
         name: "check_closest_updated_location",
     });
-    
+
     const {
         location: { party_id, id: location_id },
         station: { uid: station_uid },

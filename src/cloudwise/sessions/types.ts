@@ -27,7 +27,7 @@ export interface GetLocationsByGeoAndStatusOptions {
     lat: number;
     lng: number;
     radius_in_meters: number;
-    status?: EvseStatus;
+    statuses?: EvseStatus[];
 }
 
 export interface ClosestUpdatedLocationResult {

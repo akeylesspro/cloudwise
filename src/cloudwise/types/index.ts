@@ -83,7 +83,7 @@ export interface ParsedConnectorData {
 export type OcpiConnector = Omit<Connector, "PricePerKwh" | "ConnectionFee" | "ParkingFee" | "TariffDetails">;
 
 /// ------------------------------ evse types ------------------------------
-export type EvseStatus = "AVAILABLE" | "CHARGING" | "BLOCKED" | "INOPERATIVE";
+export type EvseStatus = "AVAILABLE" | "CHARGING" | "BLOCKED" | "INOPERATIVE" | "PREPARING";
 
 export interface Evse {
     Uid: string;
@@ -171,8 +171,8 @@ export interface CdrItem {
     OcpCountryCode: string;
     OcpPartyId: string;
     Id: string;
-    StartDateTime: string; 
-    EndDateTime: string;  
+    StartDateTime: string;
+    EndDateTime: string;
     SessionId: string;
     AuthMethod: string | null;
     AuthorizationReference: string | null;
@@ -204,7 +204,7 @@ export interface CdrItem {
     Credit: boolean;
     CreditReferenceId: string | null;
     HomeCharging: boolean;
-    LastUpdated: string; 
+    LastUpdated: string;
     AvgKwhPrice: number;
     Duration: string; // Format HH:mm:ss
 }
