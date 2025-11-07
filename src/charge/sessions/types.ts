@@ -1,4 +1,4 @@
-import { SessionCommandSettings } from "../api/types";
+import { SessionCommandSettings } from "../cloudwise_api/types";
 import { EvseStatus, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
 import type { Timestamp } from "firebase-admin/firestore";
 

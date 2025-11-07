@@ -3,7 +3,7 @@ import { parse_cdr, parse_ocpi_location } from "./helpers";
 import { ParsedOcpiLocationData } from "./types";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { isEqual } from "lodash";
-import { get_config, get_locations, get_user_cdrs, login } from "./api/helpers";
+import { get_config, get_locations, get_user_cdrs, login } from "./cloudwise_api/helpers";
 import { ChargingSession } from "./sessions/types";
 
 export const run_tasks = async () => {
@@ -11,21 +11,21 @@ export const run_tasks = async () => {
     /// login
     setInterval(login, 2 * hour);
     /// collect locations
-    execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
+    execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
     setInterval(() => {
-        execute_task("cloudwise", TaskName.collect_cloudwise_locations, task__collect_cloudwise_locations);
+        execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
     }, 12 * hour);
     /// collect cdrs
-    execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
+    execute_task("nx-charge", TaskName.collect_charge_cdrs, task__collect_charge_cdrs);
     setInterval(() => {
-        execute_task("cloudwise", TaskName.collect_cloudwise_cdrs, task__collect_cloudwise_cdrs);
+        execute_task("nx-charge", TaskName.collect_charge_cdrs, task__collect_charge_cdrs);
     }, 5 * 60 * 1000);
 };
 
-export const task__collect_cloudwise_locations = async () => {
+export const task__collect_charge_locations = async () => {
     const locations = await get_locations();
     const parsed_data = locations.map(parse_ocpi_location);
-    const cached_location: ParsedOcpiLocationData[] = cache_manager.getArrayData("cloudwise-locations");
+    const cached_location: ParsedOcpiLocationData[] = cache_manager.getArrayData("nx-charge-locations");
     const need_to_update: ParsedOcpiLocationData[] = [];
 
     for (const loc of parsed_data) {
@@ -40,18 +40,18 @@ export const task__collect_cloudwise_locations = async () => {
         need_to_update.forEach((loc) => {
             const clone: any = { ...loc };
             delete clone.id;
-            batch.set(db.collection("cloudwise-locations").doc(loc.id), clone);
+            batch.set(db.collection("nx-charge-locations").doc(loc.id), clone);
         });
         await batch.commit();
         logger.log(`Updated ${need_to_update.length} locations`);
     }
 };
 
-export const task__collect_cloudwise_cdrs = async () => {
+export const task__collect_charge_cdrs = async () => {
     const { asset_id, task_collect_cdr_debug } = get_config();
     const cdrs = await get_user_cdrs({ asset_id });
     const parsed_cdrs = cdrs.map(parse_cdr);
-    const cached_sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions").filter((session: ChargingSession) => {
+    const cached_sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions").filter((session: ChargingSession) => {
         return session.id && session.status === "completed" && !session.cdr_id;
     });
     if (task_collect_cdr_debug) {
@@ -75,8 +75,8 @@ export const task__collect_cloudwise_cdrs = async () => {
                 const cdr_id = cdr.id;
                 delete cdr.id;
                 if (cdr_id) {
-                    batch.set(db.collection("cloudwise-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
-                    batch.set(db.collection("cloudwise-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, nx_updated: session.updated });
+                    batch.set(db.collection("nx-charge-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
+                    batch.set(db.collection("nx-charge-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, nx_updated: session.updated });
                     debug_result.push({ session_id, cdr_id });
                 }
             }

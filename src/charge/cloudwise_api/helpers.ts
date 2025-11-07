@@ -46,7 +46,7 @@ export const cloudwise_request = async <T = any>(endpoint: string, payload: Reco
             throw new Error(data);
         }
         const duration = new Date().getTime() - now;
-        logger.log(`✅ cloudwise_request success: "${endpoint}" (${duration}ms)`);
+        // logger.log(`✅ cloudwise_request success: "${endpoint}" (${duration}ms)`);
         return data as T;
     } catch (error: any) {
         const duration = new Date().getTime() - now;

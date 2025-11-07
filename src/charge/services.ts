@@ -1,5 +1,5 @@
 import { Service } from "akeyless-server-commons/types";
-import { get_location_details } from "./api/helpers";
+import { get_location_details } from "./cloudwise_api/helpers";
 import { json_failed, json_ok } from "akeyless-server-commons/helpers";
 import { get_cdrs as get_cdrs_helper, parse_eves, parse_location } from "./helpers";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
@@ -11,7 +11,7 @@ export const get_location_status: Service = async (req, res) => {
     const { original_id, party_id } = req.query as TObject<string>;
     try {
         const location: ParsedOcpiLocationData | undefined = cache_manager
-            .getArrayData("cloudwise-locations")
+            .getArrayData("nx-charge-locations")
             .find((v) => v.original_id === original_id && v.party_id === party_id);
         if (!location) {
             throw new Error("Location not found");
@@ -62,7 +62,7 @@ interface GetLocationsOptions {
 export const get_locations: Service = async (req, res) => {
     const { limit = 9999, offset = 0, radius = 1000 * 10, lat, lng, operator_name, id } = req.body as GetLocationsOptions;
     try {
-        let locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("cloudwise-locations");
+        let locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("nx-charge-locations");
         if (operator_name) {
             locations = locations.filter((location) => location.company_name.toLowerCase() === operator_name.toLowerCase());
         }

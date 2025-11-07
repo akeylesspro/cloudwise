@@ -6,7 +6,7 @@ import package_json from "../../package.json";
 const router: Router = Router();
 
 router.get("/", (req, res) => {
-    res.send(process.env.mode === "qa" ? "hello from cloudwise QA" : "hello from cloudwise PROD");
+    res.send(process.env.mode === "qa" ? "hello from charge QA" : "hello from charge PROD");
 });
 
 router.get("/v", (req, res) => {

@@ -8,13 +8,13 @@ if (-not $version) {
 $currentProject = gcloud config get-value project
 if ($currentProject -eq "akeyless-nx-qa") {
     Write-Host "--------------- QA mode ----------------"
-    $imageName = "nx-cloudwise-qa"
-    $deploymentName = "nx-cloudwise-deployment-qa"
+    $imageName = "nx-charge-qa"
+    $deploymentName = "nx-charge-deployment-qa"
 }
 else {
     Write-Host "--------------- PROD mode ----------------"
-    $imageName = "nx-cloudwise"
-    $deploymentName = "nx-cloudwise-deployment"
+    $imageName = "nx-charge"
+    $deploymentName = "nx-charge-deployment"
 }
 gcloud container clusters get-credentials nx-api --zone europe-west1
 $tagsOutput = gcloud container images list-tags gcr.io/${currentProject}/${imageName} --format="get(tags)"

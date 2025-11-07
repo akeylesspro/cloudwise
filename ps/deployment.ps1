@@ -27,14 +27,14 @@ if ($v) {
 if ($currentProject -eq "akeyless-nx-qa") {
     Write-Host "--------------- QA mode ----------------"
     $enviroment = "qa"
-    $imageName = "nx-cloudwise-qa"
-    $deploymentName = "nx-cloudwise-deployment-qa"
+    $imageName = "nx-charge-qa"
+    $deploymentName = "nx-charge-deployment-qa"
 }
 else {
     Write-Host "--------------- PROD mode ----------------"
     $enviroment = "prod"
-    $imageName = "nx-cloudwise"
-    $deploymentName = "nx-cloudwise-deployment"
+    $imageName = "nx-charge"
+    $deploymentName = "nx-charge-deployment"
 }
 # ***** set kubectl context to cuurent project *****
 gcloud container clusters get-credentials nx-api --zone europe-west1

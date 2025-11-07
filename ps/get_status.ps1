@@ -1,10 +1,10 @@
 $currentProject = gcloud config get-value project
 if ($currentProject -eq "akeyless-nx-qa") {
-    $imageName = "nx-cloudwise-qa"
+    $imageName = "nx-charge-qa"
     $environment = "QA"
 }
 else { 
-    $imageName = "nx-cloudwise"
+    $imageName = "nx-charge"
     $environment = "PROD"
 }
 

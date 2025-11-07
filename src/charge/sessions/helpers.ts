@@ -1,11 +1,11 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { EvseStatus, ParsedConnectorData, ParsedOcpiLocationData } from "../types";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_session_status, get_config, get_location_details, session_command } from "../api/helpers";
+import { get_session_status, get_config, get_location_details, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
 import { parse_cdr, parse_eves, parse_location } from "../helpers";
 import { ChargingState, ClosestUpdatedLocationResult, GetDistanceMetersOptions, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
-import { SessionCommandSettings } from "../api/types";
+import { SessionCommandSettings } from "../cloudwise_api/types";
 import { set_document, sleep, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 
@@ -24,7 +24,7 @@ const get_locations_by_geo_and_status = async ({
     radius_in_meters,
     statuses = ["BLOCKED", "PREPARING"],
 }: GetLocationsByGeoAndStatusOptions): Promise<ParsedOcpiLocationData[]> => {
-    const locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("cloudwise-locations");
+    const locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("nx-charge-locations");
     const locations_data = locations.filter((location) => {
         const distance = get_distance_meters({
             lat1: lat,
@@ -169,8 +169,8 @@ export const start_session = async (charging_state_object: ChargingState) => {
             started: Timestamp.now(),
             updated: Timestamp.now(),
         };
-        await set_document("cloudwise-sessions", session_id, session);
-        await set_document("cloudwise-charging-state", car_number, {
+        await set_document("nx-charge-sessions", session_id, session);
+        await set_document("nx-charge-state", car_number, {
             ...charging_state_object,
             status: "charging",
             session_id,
@@ -185,7 +185,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
         // }, 5 * 1000);
     } catch (error) {
         logger.error("🔴 Error in start_session", error);
-        await set_document("cloudwise-charging-state", car_number, { ...charging_state_object, status: "error", timestamp: Timestamp.now() });
+        await set_document("nx-charge-state", car_number, { ...charging_state_object, status: "error", timestamp: Timestamp.now() });
     }
 };
 
@@ -193,7 +193,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
 export const stop_session = async (session_id: string, reason: string) => {
     logger.log(`Stopping session: "${session_id}" with reason: "${reason}" ...`);
     try {
-        const sessions: ChargingSession[] = cache_manager.getArrayData("cloudwise-sessions");
+        const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions");
         const session = sessions.find((session) => session.id === session_id);
         if (!session) {
             throw new Error("Session not found");
@@ -212,13 +212,13 @@ export const stop_session = async (session_id: string, reason: string) => {
         logger.log(`⛔ Session "${session_id}" stopped`);
 
         /// update session status
-        await set_document("cloudwise-sessions", session_id, {
+        await set_document("nx-charge-sessions", session_id, {
             ...session,
             status: "completed",
             updated: Timestamp.now(),
             ended: Timestamp.now(),
         });
-        await set_document("cloudwise-charging-state", session.car_number, { status: "plugout", session_id: "", timestamp: Timestamp.now() });
+        await set_document("nx-charge-state", session.car_number, { status: "plugout", session_id: "", timestamp: Timestamp.now() });
 
         /// async update session and cdr (if exists)
         setTimeout(async () => {
@@ -239,14 +239,14 @@ export const stop_session = async (session_id: string, reason: string) => {
                     const cdr_id = parsed_cdr.id;
                     delete parsed_cdr.id;
                     update.cdr_id = cdr_id;
-                    await set_document("cloudwise-cdrs", cdr_id!, {
+                    await set_document("nx-charge-cdrs", cdr_id!, {
                         ...parsed_cdr,
                         session_id,
                         car_number: session.car_number,
                         nx_updated: Timestamp.now(),
                     });
                 }
-                await set_document("cloudwise-sessions", session_id, update);
+                await set_document("nx-charge-sessions", session_id, update);
             }
         }, 30 * 1000);
     } catch (error) {
@@ -274,7 +274,7 @@ export const handle_active_session = async (session_id: string) => {
                     clearTimeout(timer);
                 }
                 setTimeout(async () => {
-                    const sessions = cache_manager.getArrayData("cloudwise-sessions");
+                    const sessions = cache_manager.getArrayData("nx-charge-sessions");
                     const session = sessions.find((session) => session.id === session_id);
                     if (session && session.status !== "completed") {
                         await stop_session(session_id, `Session status is: ${CommandStatus}`);
@@ -286,10 +286,10 @@ export const handle_active_session = async (session_id: string) => {
             if (timer) {
                 clearTimeout(timer);
             }
-            const sessions = cache_manager.getArrayData("cloudwise-sessions");
+            const sessions = cache_manager.getArrayData("nx-charge-sessions");
             const session = sessions.find((session) => session.id === session_id);
             if (session) {
-                await set_document("cloudwise-sessions", session_id, { status: "error", updated: Timestamp.now(), ended: Timestamp.now() });
+                await set_document("nx-charge-sessions", session_id, { status: "error", updated: Timestamp.now(), ended: Timestamp.now() });
             }
         }
     };
@@ -328,7 +328,7 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
 };
 
 export const handle_charging_state_add_and_edit = (charging_states: ChargingState[]) => {
-    let prev: ChargingState[] = cache_manager.getArrayData("cloudwise-charging-state");
+    let prev: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
     const { allowed_cars } = get_config();
     charging_states.forEach((new_car) => {
         const old_car = prev.find((old) => old.car_number === new_car.car_number);
@@ -353,5 +353,5 @@ export const handle_charging_state_add_and_edit = (charging_states: ChargingStat
         }
         prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));
     });
-    cache_manager.setArrayData("cloudwise-charging-state", prev);
+    cache_manager.setArrayData("nx-charge-state", prev);
 };
