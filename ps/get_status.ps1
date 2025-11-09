@@ -8,6 +8,9 @@ else {
     $environment = "PROD"
 }
 
+gcloud container clusters get-credentials nx-api --zone europe-west1
+
+
 $tagsOutput = gcloud container images list-tags gcr.io/${currentProject}/${imageName} --format="json"
 
 # Parse JSON output
