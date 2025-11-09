@@ -8,7 +8,11 @@ import { login } from "./charge/cloudwise_api/helpers";
 
 const init = async () => {
     const version = package_json.version;
-    await basic_init(main_router, "nx-charge", version);
+    await basic_init(main_router, "nx-charge", version, {
+        init_snapshot_options: {
+            subscription_type: "redis",
+        },
+    });
     await login();
     await initialize_snapshot();
     await run_tasks();

@@ -314,30 +314,27 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
         case "charging":
             await handle_active_session(charging_state_object.session_id!);
             break;
-        // case "plugout":
         case "error":
             if (charging_state_object.session_id?.length) {
                 logger.warn(`🔴 Stopping session from status snapshot ...  `);
                 await stop_session(charging_state_object.session_id, "error in session status");
             }
             break;
-
         default:
             break;
     }
 };
 
 export const handle_charging_state_add_and_edit = (charging_states: ChargingState[]) => {
-    let prev: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
+    const cache_data: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
     const { allowed_cars } = get_config();
     charging_states.forEach((new_car) => {
-        const old_car = prev.find((old) => old.car_number === new_car.car_number);
+        const old_car = cache_data.find((old) => old.car_number === new_car.car_number);
         if (!old_car) {
             if (allowed_cars.includes(new_car.car_number)) {
                 logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
             }
             handle_status_change(new_car);
-            prev = [...prev, new_car];
             return;
         }
         const [old_status, new_status] = [old_car.status, new_car.status];
@@ -351,7 +348,5 @@ export const handle_charging_state_add_and_edit = (charging_states: ChargingStat
             }
             handle_status_change(new_car);
         }
-        prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));
     });
-    cache_manager.setArrayData("nx-charge-state", prev);
 };
