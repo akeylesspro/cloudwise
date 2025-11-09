@@ -326,15 +326,16 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
 };
 
 export const handle_charging_state_add_and_edit = (charging_states: ChargingState[]) => {
-    const cache_data: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
+    let prev: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
     const { allowed_cars } = get_config();
     charging_states.forEach((new_car) => {
-        const old_car = cache_data.find((old) => old.car_number === new_car.car_number);
+        const old_car = prev.find((old) => old.car_number === new_car.car_number);
         if (!old_car) {
             if (allowed_cars.includes(new_car.car_number)) {
                 logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
             }
             handle_status_change(new_car);
+            prev = [...prev, new_car];
             return;
         }
         const [old_status, new_status] = [old_car.status, new_car.status];
@@ -348,5 +349,7 @@ export const handle_charging_state_add_and_edit = (charging_states: ChargingStat
             }
             handle_status_change(new_car);
         }
+        prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));
     });
+    cache_manager.setArrayData("nx-charge-state", prev);
 };
