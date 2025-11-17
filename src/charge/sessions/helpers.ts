@@ -8,6 +8,7 @@ import { ChargingState, ClosestUpdatedLocationResult, GetDistanceMetersOptions, 
 import { SessionCommandSettings } from "../cloudwise_api/types";
 import { send_sms, set_document, sleep, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
+import { Car } from "akeyless-types-commons";
 
 /// ------------------ get locations by geo and status ------------------
 export const get_distance_meters = ({ lat1, lat2, lng1, lng2 }: GetDistanceMetersOptions): number => {
@@ -311,8 +312,8 @@ export const handle_active_session = async (session_id: string, car_number: stri
 /// ------------------ handle charging state add and edit ------------------
 const handle_status_change = async (charging_state_object: ChargingState) => {
     const { status, car_number } = charging_state_object;
-    const { allowed_cars } = get_config();
-    if (!allowed_cars.includes(car_number)) {
+    const { credit_balance_threshold } = get_config();
+    if (!check_car_charging_features(car_number)) {
         return;
     }
     switch (status) {
@@ -343,11 +344,10 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
 
 export const handle_charging_state_add_and_edit = (charging_states: ChargingState[]) => {
     let prev: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
-    const { allowed_cars } = get_config();
     charging_states.forEach((new_car) => {
         const old_car = prev.find((old) => old.car_number === new_car.car_number);
         if (!old_car) {
-            if (allowed_cars.includes(new_car.car_number)) {
+            if (check_car_charging_features(new_car.car_number)) {
                 logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
             }
             handle_status_change(new_car);
@@ -360,7 +360,7 @@ export const handle_charging_state_add_and_edit = (charging_states: ChargingStat
                 logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
                 return;
             }
-            if (allowed_cars.includes(new_car.car_number)) {
+            if (check_car_charging_features(new_car.car_number)) {
                 logger.log(`ℹ️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
             }
             handle_status_change(new_car);
@@ -369,3 +369,18 @@ export const handle_charging_state_add_and_edit = (charging_states: ChargingStat
     });
     cache_manager.setArrayData("nx-charge-state", prev);
 };
+
+const check_car_charging_features = (car_number: string): boolean => {
+    const units: Car[] = cache_manager.getArrayData("units");
+    const car = units.find((car) => car.carId.trim() === car_number.trim());
+    if (!car) {
+        return false;
+    }
+    const car_features = car.features || [];
+    return car_features.includes("charge") && car_features.includes("plug_and_charge");
+};
+
+// const check_car_charge_credit_balance = async (car_number: string)=> {
+//     const { credit_balance_threshold } = get_config();
+
+// }

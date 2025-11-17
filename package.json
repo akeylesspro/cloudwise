@@ -1,6 +1,6 @@
 {
     "name": "nx-charge",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "description": "responsible for all akeyless cache-server",
     "main": "index.js",
     "scripts": {
@@ -24,6 +24,7 @@
         "akeyless-types-commons": "^1.0.78",
         "axios": "^1.6.8",
         "express": "^4.19.2",
+        "firebase": "^12.6.0",
         "lodash": "^4.17.21",
         "moment": "^2.30.1",
         "moment-timezone": "^0.5.45",
