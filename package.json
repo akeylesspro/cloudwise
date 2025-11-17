@@ -1,6 +1,6 @@
 {
     "name": "nx-charge",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "responsible for all akeyless cache-server",
     "main": "index.js",
     "scripts": {
@@ -20,8 +20,8 @@
     "dependencies": {
         "@avto-dev/vehicle-logotypes": "^2.10.0",
         "@types/ping": "^0.4.4",
-        "akeyless-server-commons": "^1.0.140",
-        "akeyless-types-commons": "^1.0.45",
+        "akeyless-server-commons": "^1.0.146",
+        "akeyless-types-commons": "^1.0.78",
         "axios": "^1.6.8",
         "express": "^4.19.2",
         "lodash": "^4.17.21",

@@ -6,7 +6,7 @@ import moment from "moment";
 import { parse_cdr, parse_eves, parse_location } from "../helpers";
 import { ChargingState, ClosestUpdatedLocationResult, GetDistanceMetersOptions, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { SessionCommandSettings } from "../cloudwise_api/types";
-import { set_document, sleep, timestamp_to_string } from "akeyless-server-commons/helpers";
+import { send_sms, set_document, sleep, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 
 /// ------------------ get locations by geo and status ------------------
@@ -150,8 +150,8 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
 
 /// ------------------ start session ------------------
 export const start_session = async (charging_state_object: ChargingState) => {
-    const { car_number } = charging_state_object;
-    logger.log(`Starting session for car: "${car_number}" ...`);
+    const { car_number, lat, lng } = charging_state_object;
+    logger.log(`Starting session for car: "${car_number}" ...`, { lat, lng });
     try {
         const command_settings = await get_start_session_settings(charging_state_object);
         const request = async () => await session_command(command_settings);
@@ -176,7 +176,9 @@ export const start_session = async (charging_state_object: ChargingState) => {
             session_id,
             timestamp: Timestamp.now(),
         });
-
+        if (car_number === "16457003") {
+            send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
+        }
         ///  interval for test during session
         // setInterval(async () => {
         //     const { asset_id, ble_id, device_id } = get_config();
@@ -255,7 +257,7 @@ export const stop_session = async (session_id: string, reason: string) => {
 };
 
 /// ------------------ handle active session ------------------
-export const handle_active_session = async (session_id: string) => {
+export const handle_active_session = async (session_id: string, car_number: string) => {
     let timer: NodeJS.Timeout | undefined;
     const run = async () => {
         const { asset_id, ble_id, device_id } = get_config();
@@ -278,6 +280,9 @@ export const handle_active_session = async (session_id: string) => {
                     const session = sessions.find((session) => session.id === session_id);
                     if (session && session.status !== "completed") {
                         await stop_session(session_id, `Session status is: ${CommandStatus}`);
+                        if (car_number === "16457003") {
+                            send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} סיים טעינה בהצלחה`, "naor tests");
+                        }
                     }
                 }, 10 * 1000);
             }
@@ -290,6 +295,9 @@ export const handle_active_session = async (session_id: string) => {
             const session = sessions.find((session) => session.id === session_id);
             if (session) {
                 await set_document("nx-charge-sessions", session_id, { status: "error", updated: Timestamp.now(), ended: Timestamp.now() });
+                if (car_number === "16457003") {
+                    send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} קיבל שגיאה בטעינה`, "naor tests");
+                }
             }
         }
     };
@@ -309,10 +317,18 @@ const handle_status_change = async (charging_state_object: ChargingState) => {
     }
     switch (status) {
         case "plugin":
+            if (car_number === "16457003") {
+                send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");
+            }
             await start_session(charging_state_object);
             break;
         case "charging":
-            await handle_active_session(charging_state_object.session_id!);
+            await handle_active_session(charging_state_object.session_id!, car_number);
+            break;
+        case "plugout":
+            if (car_number === "16457003") {
+                send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugout", "naor tests");
+            }
             break;
         case "error":
             if (charging_state_object.session_id?.length) {
