@@ -14,13 +14,7 @@ export interface ChargingState {
     lng: number;
     timestamp: Timestamp;
     session_id?: string;
-}
-
-export interface GetDistanceMetersOptions {
-    lat1: number;
-    lng1: number;
-    lat2: number;
-    lng2: number;
+    message?: string;
 }
 
 export interface GetLocationsByGeoAndStatusOptions {

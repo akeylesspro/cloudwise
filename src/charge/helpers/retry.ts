@@ -50,7 +50,7 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
             if (throw_if_empty_result) {
                 const is_empty = typeof is_empty_result_fn === "function" ? is_empty_result_fn(result) : is_result_empty_default(result);
                 if (is_empty) {
-                    const empty_error: Error = new Error("Empty result from retried function");
+                    const empty_error: Error = new Error(`Empty result for function "${name}"`);
                     empty_error.name = "EMPTY_RESULT";
                     throw empty_error;
                 }

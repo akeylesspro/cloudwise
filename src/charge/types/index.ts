@@ -228,3 +228,11 @@ export interface ParsedCdrItem {
     car_number?: string;
     nx_updated?: Timestamp;
 }
+
+// ------------------------------ helpers types ------------------------------
+export interface GetDistanceMetersOptions {
+    lat1: number;
+    lng1: number;
+    lat2: number;
+    lng2: number;
+}

@@ -140,7 +140,7 @@ export const session_command = async (settings: SessionCommandSettings): Promise
     return data;
 };
 
-export const get_session_status = async (options: GetSessionStatusOptions): Promise<GetCommandStatusResponse> => {
+export const get_session_status_api = async (options: GetSessionStatusOptions): Promise<GetCommandStatusResponse> => {
     const { asset_id, ble_id, session_id, device_id } = options || {};
 
     const data = await cloudwise_request<GetCommandStatusResponse>("getCommandStatus", {
