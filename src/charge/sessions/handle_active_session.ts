@@ -1,10 +1,10 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
-import { get_config, get_session_status_api } from "../../cloudwise_api/helpers";
-import { retry } from "../../helpers/retry";
+import { get_config, get_session_status_api } from "../cloudwise_api/helpers";
+import { retry } from "../helpers/retry";
 import { send_sms, set_document } from "akeyless-server-commons/helpers";
 import { stop_session } from "./stop_session";
-import { ParsedSession } from "../types";
-import { check_car_charge_credit_balance, parse_session } from "../../helpers";
+import type { ParsedSession } from "./types";
+import { check_car_charge_credit_balance, parse_session } from "../helpers";
 
 const active_timers = new Map<string, NodeJS.Timeout>();
 

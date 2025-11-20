@@ -2,7 +2,7 @@ import { send_sms } from "akeyless-server-commons/helpers";
 import { start_session } from "./start_session";
 import { handle_active_session } from "./handle_active_session";
 import { stop_session } from "./stop_session";
-import { ChargingState } from "../types";
+import type { ChargingState } from "./types";
 import { cache_manager } from "akeyless-server-commons/managers";
 import { logger } from "akeyless-server-commons/managers";
 import { Car } from "akeyless-types-commons";

@@ -4,7 +4,7 @@ import { json_failed, json_ok } from "akeyless-server-commons/helpers";
 import { get_cdrs as get_cdrs_helper, get_distance_meters, parse_eves, parse_location } from "./helpers";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { ParsedOcpiLocationData } from "./types";
-import { stop_session as stop_session_helper } from "./sessions/helpers";
+import { stop_session as stop_session_helper } from "./sessions";
 import { TObject } from "akeyless-types-commons";
 
 export const get_location_status: Service = async (req, res) => {

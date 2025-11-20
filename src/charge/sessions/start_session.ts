@@ -1,13 +1,13 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
-import { EvseStatus, ParsedConnectorData, ParsedOcpiLocationData } from "../../types";
-import { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndStatusOptions, ChargingSession } from "../types";
+import { EvseStatus, ParsedConnectorData, ParsedOcpiLocationData } from "../types";
+import type { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_config, get_location_details, session_command } from "../../cloudwise_api/helpers";
+import { get_config, get_location_details, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
-import { check_car_charge_credit_balance, get_distance_meters, parse_eves, parse_location } from "../../helpers";
-import { SendCommandResponse, SessionCommandSettings } from "../../cloudwise_api/types";
+import { check_car_charge_credit_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
+import { SendCommandResponse, SessionCommandSettings } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
-import { retry } from "../../helpers/retry";
+import { retry } from "../helpers/retry";
 
 /// ------------------ start session (main function) ------------------
 export const start_session = async (charging_state_object: ChargingState) => {

@@ -1,11 +1,11 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_session_status_api, get_config, session_command } from "../../cloudwise_api/helpers";
-import { parse_cdr } from "../../helpers";
-import { ChargingSession } from "../types";
-import { SessionCommandSettings } from "../../cloudwise_api/types";
+import { get_session_status_api, get_config, session_command } from "../cloudwise_api/helpers";
+import { parse_cdr } from "../helpers";
+import type { ChargingSession } from "./types";
+import { SessionCommandSettings } from "../cloudwise_api/types";
 import { set_document } from "akeyless-server-commons/helpers";
-import { retry } from "../../helpers/retry";
+import { retry } from "../helpers/retry";
 
 interface StopSessionPayload {
     status?: "completed" | "error";

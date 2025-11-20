@@ -3,7 +3,7 @@ import { getAuth, signInWithCustomToken, UserCredential } from "firebase/auth";
 import dotenv from "dotenv";
 import { auth, init_env_variables, redis_snapshots_bulk, snapshot_bulk_by_names } from "akeyless-server-commons/helpers";
 import { cache_manager } from "akeyless-server-commons/managers";
-import { handle_charging_state_snapshot, on_snapshot_first_time } from "../sessions/helpers";
+import { handle_charging_state_snapshot, on_snapshot_first_time } from "../sessions";
 
 dotenv.config();
 
