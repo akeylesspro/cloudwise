@@ -1,3 +1,5 @@
+import { GetCommandStatusResponse } from "../cloudwise_api/types";
+import { ParsedSession } from "../sessions/types";
 import {
     CdrItem,
     Connector,
@@ -197,4 +199,16 @@ export const parse_cdr = (cdr: CdrItem): ParsedCdrItem => {
     };
 
     return res;
+};
+
+export const parse_session = (session: GetCommandStatusResponse): ParsedSession => {
+    const { CommandStatus: session_status, Cost: cost, ChargingTimeInSeconds, KWh: kw, Cdr: cdr, CommandId: session_id, } = session;
+    return {
+        session_status,
+        cost: Number(cost) || 0,
+        charging_time_in_seconds: Number(ChargingTimeInSeconds) || 0,
+        kwh: Number(kw) || 0,
+        cdr: cdr ? parse_cdr(cdr) : undefined,
+        session_id: session_id || "",
+    };
 };

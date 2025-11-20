@@ -29,7 +29,7 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
                 logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
                 // Check if there's an active session that should be stopped
                 if (new_car.session_id) {
-                    stop_session(new_car.session_id, "Invalid state transition detected");
+                    stop_session(new_car.session_id, { message: "Invalid state transition detected", status: "error" });
                 }
                 return;
             }
@@ -42,6 +42,7 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
     });
     cache_manager.setArrayData("nx-charge-state", prev);
 };
+
 export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
     cache_manager.setArrayData("nx-charge-state", charging_states);
     for (const charging_state of charging_states) {
@@ -57,12 +58,6 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
                 if (charging_state.session_id) {
                     logger.log(`🔄 Resuming monitoring for session ${charging_state.session_id}`);
                     handle_active_session(charging_state.session_id, charging_state.car_number);
-                }
-                break;
-            case "error":
-                if (charging_state.session_id) {
-                    logger.warn(`🔴 Stopping session from status snapshot ...  `);
-                    stop_session(charging_state.session_id, charging_state.message || "error in session status");
                 }
                 break;
             default:
@@ -86,12 +81,6 @@ const handle_car_status_change = async (charging_state_object: ChargingState) =>
         case "plugout":
             if (car_number === "16457003") {
                 send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugout", "naor tests");
-            }
-            break;
-        case "error":
-            if (charging_state_object.session_id?.length) {
-                logger.warn(`🔴 Stopping session from status snapshot ...  `);
-                await stop_session(charging_state_object.session_id, charging_state_object.message || "error in session status");
             }
             break;
         default:

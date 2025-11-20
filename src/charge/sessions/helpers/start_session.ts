@@ -189,9 +189,9 @@ const get_last_updated_location = (
 
 const get_start_session_settings = async (charging_state_object: ChargingState): Promise<SessionCommandSettings> => {
     const { timestamp } = charging_state_object;
-    // locations with distance less than "radius_in_meters" and with statuses: BLOCKED, PREPARING
+    /// locations with distance less than "radius_in_meters" and with statuses: BLOCKED, PREPARING
     const closest_locations = await get_closest_locations(charging_state_object);
-    /// location that match the closest updated time
+    /// get the location that match the closest updated time
     const {
         location,
         station: { uid: station_uid },

@@ -32,7 +32,7 @@ export const get_location_status: Service = async (req, res) => {
 export const stop_session: Service = async (req, res) => {
     const { session_id } = req.body;
     try {
-        await stop_session_helper(session_id, "API call");
+        await stop_session_helper(session_id, { message: "API call" });
         res.json(json_ok({ message: "Session stopped" }));
     } catch (error) {
         res.json(json_failed(error));

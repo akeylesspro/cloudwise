@@ -1,20 +1,23 @@
 import { SessionCommandSettings } from "../cloudwise_api/types";
-import { EvseStatus, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
+import { EvseStatus, ParsedCdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
 import type { Timestamp } from "firebase-admin/firestore";
 
-type ChargingStatus = "plugin" | "charging" | "plugout" | "error";
+type ChargingStateStatus = "plugin" | "charging" | "plugout" | "error" | "completed";
+
+export type SessionStatus = "started" | "completed" | "error";
 
 export type CommandStatus = "ACTIVE" | "COMPLETED" | "FAILED";
 
 export interface ChargingState {
     id: string;
-    status: ChargingStatus;
+    status: ChargingStateStatus;
     car_number: string;
     lat: number;
     lng: number;
     timestamp: Timestamp;
     session_id?: string;
     message?: string;
+    is_charging?: boolean;
 }
 
 export interface GetLocationsByGeoAndStatusOptions {
@@ -37,7 +40,16 @@ export interface ChargingSession extends Omit<SessionCommandSettings, "command">
     updated: Timestamp;
     started: Timestamp;
     ended?: Timestamp;
-    status: "started" | "completed" | "error";
+    status: SessionStatus;
     message?: string;
     cdr_id?: string;
+}
+
+export interface ParsedSession {
+    session_status: CommandStatus;
+    cost: number;
+    charging_time_in_seconds: number;
+    kwh: number;
+    cdr?: ParsedCdrItem;
+    session_id: string;
 }
