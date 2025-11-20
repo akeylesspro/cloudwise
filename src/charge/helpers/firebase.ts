@@ -3,7 +3,7 @@ import { getAuth, signInWithCustomToken, UserCredential } from "firebase/auth";
 import dotenv from "dotenv";
 import { auth, init_env_variables, redis_snapshots_bulk, snapshot_bulk_by_names } from "akeyless-server-commons/helpers";
 import { cache_manager } from "akeyless-server-commons/managers";
-import { handle_charging_state_snapshot } from "../sessions/helpers";
+import { handle_charging_state_snapshot, on_snapshot_first_time } from "../sessions/helpers";
 
 dotenv.config();
 
@@ -21,7 +21,7 @@ const firebase_config: FirebaseOptions = {
 const firebase_app = initializeApp(firebase_config);
 
 export const get_custom_fb_token = async (): Promise<string> => {
-    const custom_token = await auth.createCustomToken("nx_charge", { role: "backend", action: "plug_and_charge" });
+    const custom_token = await auth.createCustomToken("charge", { role: "backend" });
     const userCredential: UserCredential = await signInWithCustomToken(getAuth(firebase_app), custom_token);
     const token = await userCredential.user.getIdToken();
     return token;
@@ -33,9 +33,7 @@ export const initialize_snapshot = async () => {
         {
             collection_name: "nx-charge-state",
             subscription_type: "redis",
-            on_first_time: (docs) => {
-                cache_manager.setArrayData("nx-charge-state", docs);
-            },
+            on_first_time: on_snapshot_first_time,
             on_add: handle_charging_state_snapshot,
             on_modify: handle_charging_state_snapshot,
             on_remove: (docs) => {

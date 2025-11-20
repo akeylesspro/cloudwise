@@ -38,5 +38,6 @@ export interface ChargingSession extends Omit<SessionCommandSettings, "command">
     started: Timestamp;
     ended?: Timestamp;
     status: "started" | "completed" | "error";
+    message?: string;
     cdr_id?: string;
 }

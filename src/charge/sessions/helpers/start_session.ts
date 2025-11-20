@@ -14,9 +14,9 @@ export const start_session = async (charging_state_object: ChargingState) => {
     const { car_number, lat, lng } = charging_state_object;
     logger.log(`Starting session for car: "${car_number}" ...`, { lat, lng });
     try {
-        /// step 1: get closest locations
+        /// step 1: check credit balance
         await check_credit_balance(car_number);
-        /// steps 2 & 3: get start session settings
+        /// steps 2 & 3: get start session settings (closest location and connector)
         const command_settings = await get_start_session_settings(charging_state_object);
         /// step 4: send start session command
         const session_id = await send_start_session_command(command_settings);
@@ -57,7 +57,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
 };
 
 const check_credit_balance = async (car_number: string) => {
-    const is_has_balance = await check_car_charge_credit_balance(car_number);
+    const { is_has_balance } = await check_car_charge_credit_balance(car_number);
     if (!is_has_balance) {
         logger.error(`🔴 Car "${car_number}" does not have enough balance`);
         throw new Error("start_step_1__failed_to_check_car_charge_credit_balance");

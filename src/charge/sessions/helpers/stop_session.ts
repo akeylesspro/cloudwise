@@ -8,8 +8,8 @@ import { set_document } from "akeyless-server-commons/helpers";
 import { retry } from "../../helpers/retry";
 
 /// ------------------ end session ------------------
-export const stop_session = async (session_id: string, reason: string) => {
-    logger.log(`Stopping session: "${session_id}" with reason: "${reason}" ...`);
+export const stop_session = async (session_id: string, message: string) => {
+    logger.log(`⛔ Stopping session: "${session_id}" with message: "${message}" ...`);
     try {
         const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions");
         const session = sessions.find((session) => session.id === session_id);
@@ -35,8 +35,9 @@ export const stop_session = async (session_id: string, reason: string) => {
             status: "completed",
             updated: Timestamp.now(),
             ended: Timestamp.now(),
+            message,
         });
-        await set_document("nx-charge-state", session.car_number, { status: "plugout", session_id: "", timestamp: Timestamp.now() });
+        await set_document("nx-charge-state", session.car_number, { status: "plugout", session_id: "", timestamp: Timestamp.now(), message });
 
         /// async update session and cdr (if exists)
         setTimeout(async () => {

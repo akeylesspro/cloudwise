@@ -27,6 +27,10 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
         if (old_status !== new_status) {
             if (old_status === "charging" && new_status === "plugin") {
                 logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
+                // Check if there's an active session that should be stopped
+                if (new_car.session_id) {
+                    stop_session(new_car.session_id, "Invalid state transition detected");
+                }
                 return;
             }
             if (check_car_charging_features(new_car.car_number)) {
@@ -37,6 +41,34 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
         prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));
     });
     cache_manager.setArrayData("nx-charge-state", prev);
+};
+export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
+    cache_manager.setArrayData("nx-charge-state", charging_states);
+    for (const charging_state of charging_states) {
+        const { status, car_number } = charging_state;
+        switch (status) {
+            case "plugin":
+                if (car_number === "16457003") {
+                    send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");
+                }
+                start_session(charging_state);
+                break;
+            case "charging":
+                if (charging_state.session_id) {
+                    logger.log(`🔄 Resuming monitoring for session ${charging_state.session_id}`);
+                    handle_active_session(charging_state.session_id, charging_state.car_number);
+                }
+                break;
+            case "error":
+                if (charging_state.session_id) {
+                    logger.warn(`🔴 Stopping session from status snapshot ...  `);
+                    stop_session(charging_state.session_id, charging_state.message || "error in session status");
+                }
+                break;
+            default:
+                break;
+        }
+    }
 };
 
 const handle_car_status_change = async (charging_state_object: ChargingState) => {
@@ -59,7 +91,7 @@ const handle_car_status_change = async (charging_state_object: ChargingState) =>
         case "error":
             if (charging_state_object.session_id?.length) {
                 logger.warn(`🔴 Stopping session from status snapshot ...  `);
-                await stop_session(charging_state_object.session_id, "error in session status");
+                await stop_session(charging_state_object.session_id, charging_state_object.message || "error in session status");
             }
             break;
         default:
