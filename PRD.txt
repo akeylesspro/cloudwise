@@ -1,42 +1,80 @@
 **** Source ****
 @src
---------------------------------------------------------------------
+------------------------------------------------------------------------------------
 **** Presentation ****
-This is my server that should handle automatic charging (in addition to other things that we will not focus on right now)
+This is my server that should handle automatic charging of vehicles and credit charging.
 I have the collections "nx-charge-state", "nx-charge-sessions"
-which are responsible for managing this
-The nx-charge-state collection contains the current state of a vehicle (one-to-one)
-The nx-charge-sessions collection is responsible for saving all sessions of the vehicle (one-to-many)
+which are responsible for managing this.
+The nx-charge-state collection contains the current state of the vehicle (one-to-one)
+The nx-charge-sessions collection is responsible for storing all the sessions of the vehicle (one-to-many)
 I listen to the following events in the nx-charge-state collection and follow the following diagram:
-** Charging start **
-I expect to receive an add-on event in nx-charge-state and then start a charging session
-Before I start a charging session I do 3 things
-1 I make sure that the vehicle has enough credit to start charging if not then I throw an error and update the nx-charge-state collection with the error
-2 I make sure that there are chargers with a status of waiting to charge in the area where I received the event, if there are none, then I Throws an error and updates the nx-charge-state collection with an error.
-3 I get the closest charge to the time I received the event. If I don't find such an event, then I throw an error and update the nx-charge-state collection with an error.
-4 I send a start charge in the API and change the status of nx-charge-state to charging. If that doesn't work, then I throw an error and update the nx-charge-state collection with an error.
-** Charge exists **
-When I get a charge event in nx-charge-state
-I start a timer that does a few things:
-1 I get the status of the current session in the API and check that it hasn't expired. If so, I take care of updating the collections.
 
-2 I check that there is enough credit to continue charging. If not, I throw an error and update the nx-charge-state collection with an error.
+** Charging started **
+I expect to receive another event in nx-charge-state and then start a charging session
+Before I start a charging session I do 3 things:
+
+1 I make sure that the vehicle has enough credit to start charging if not then I throw an error and update the nx-charge-state collection with the error
+
+2 I make sure that there are chargers with a status of waiting to charge in the area where I received the event, if there are none, I throw an error and update the nx-charge-state collection with an error.
+
+3 I get the closest charging to the time I received the event. If I don't find such an event, I throw an error and update the nx-charge-state collection with an error.
+
+After I have the data I do a few more things:
+
+1 I send an initial charge in the API and change the status of nx-charge-state to charging. If that doesn't work, I throw an error and update the nx-charge-state collection with an error.
+2 I update the nx-charge-state and nx-charge-sessions collections that I started charging
+3 Print a log and send an SMS (only for a specific vehicle)
+
+** Active charging session**
+When I receive a charging event in nx-charge-state
+I start a timer that does a few things:
+
+1 I get the status of the current session in the API and check that it hasn't expired. If so, I make sure to update the collections.
+
+2 I check that there is enough credit to continue charging. If not, I end the session.
+
 ** Error **
 If there is any error, I update the relevant code
 
-------------------------------------------------------------------------------------------
+*** End session ***
+
+At the end of a session, I do a few things:
+
+1 Make sure that the session is indeed valid and correct
+
+2 Send an API command to end the session
+
+3 Make sure to charge the session
+
+4 Update cookies
+
+5 Collect CDR and complete the charging of the entire operation
+
+------------------------------------------------------------------------------------
+
 **** Tasks ****
-1 I want you to go through my code and see that everything I said is correct
-2 I want you to check for cases that have not been addressed and suggest solutions to address them if there are any
-3 I want you to look for possible bugs and suggest solutions
-4 I want a summarized opinion on the entire project and a score of how good it is
-5 It is very important that you take your time before answering an answer. Don't be afraid to delve into things, and if you don't understand something before you start the analysis, ask me about it and don't ignore it or jump to wrong conclusions
-6 In addition, answer with an accuracy of 95%
-------------------------------------------------------------------------------------------------
+1 I want you to go through my code and see that everything in my requirements is correct and implemented, and if you don't tell me, if there is something that is implemented that I didn't write in the presentation, tell me too
+
+2 I want you to check for unhandled cases or abnormal flow of statuses and inconsistent cases and suggest solutions to handle them
+
+3 I want you to look for bugs and possible failure points and suggest solutions
+
+4 I want a summary opinion on the entire project and a score of how good it is
+
+5 Very important Take your time before answering. Don't be afraid to delve into things, and if you don't understand something before you start the analysis, ask me about it and don't ignore it or jump to wrong conclusions.
+
+6 In addition, you will answer with an accuracy of 95%, no less than or more
+- ...
 
 **** Format ****
-I want the analysis result in a .md file at the root of the project
-The file will contain three sections with a clear separation between them
-1 The analysis result and insights from it
-2 The section of bugs/problems and the solutions proposed to them, which is a list sorted by priority and with Icons by priority type
-3 Short summary including score
+I want the analysis result in a .md file in the root of the project.
+
+The file will contain three parts with a clear separation between them.
+
+1 The analysis result and the insights from it.
+
+2 Some of the bugs/problems and the proposed solutions to them, which is a list organized with icons according to priority type.
+
+3 A short summary that includes a score.
+
+Give short and to the point answers without expanding too much in text

@@ -4,7 +4,7 @@ import { json_failed, json_ok } from "akeyless-server-commons/helpers";
 import { get_cdrs as get_cdrs_helper, get_distance_meters, parse_eves, parse_location } from "./helpers";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { ParsedOcpiLocationData } from "./types";
-import { stop_session as stop_session_helper } from "./sessions";
+import { stop_session } from "./sessions";
 import { TObject } from "akeyless-types-commons";
 
 export const get_location_status: Service = async (req, res) => {
@@ -29,10 +29,10 @@ export const get_location_status: Service = async (req, res) => {
     }
 };
 
-export const stop_session: Service = async (req, res) => {
+export const stop_session_service: Service = async (req, res) => {
     const { session_id } = req.body;
     try {
-        await stop_session_helper(session_id, { message: "API call" });
+        await stop_session(session_id, { message: "API call" });
         res.json(json_ok({ message: "Session stopped" }));
     } catch (error) {
         res.json(json_failed(error));

@@ -4,11 +4,12 @@ import { ParsedOcpiLocationData } from "./types";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { isEqual } from "lodash";
 import { get_config, get_locations, get_user_cdrs, login } from "./cloudwise_api/helpers";
-import { ChargingSession } from "./sessions/types";
+import { ChargingSession, SessionWithId } from "./sessions/types";
+import { charge_cdr } from "./sessions";
 
 export const run_tasks = async () => {
     const hour = 60 * 60 * 1000;
-    
+
     /// login
     setInterval(login, 2 * hour);
     /// collect locations
@@ -53,7 +54,7 @@ export const task__collect_charge_cdrs = async () => {
     const cdrs = await get_user_cdrs({ asset_id });
     const parsed_cdrs = cdrs.map(parse_cdr);
     const cached_sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions").filter((session: ChargingSession) => {
-        return session.id && session.status === "completed" && !session.cdr_id;
+        return session.id && session.status !== "started" && !session.cdr_id;
     });
     if (task_collect_cdr_debug) {
         logger.log(`🔍 Found ${cached_sessions.length} completed sessions without CDR`);
@@ -65,19 +66,29 @@ export const task__collect_charge_cdrs = async () => {
     const debug_result: any[] = [];
     if (cached_sessions.length) {
         const batch = db.batch();
-        cached_sessions.forEach((session) => {
+        cached_sessions.forEach(async (session) => {
             if (!session.id) {
                 return;
             }
             const session_id = session.id;
-            delete session.id;
             const cdr = parsed_cdrs.find((cdr) => cdr.session_id === session_id);
             if (cdr) {
                 const cdr_id = cdr.id;
-                delete cdr.id;
                 if (cdr_id) {
-                    batch.set(db.collection("nx-charge-sessions").doc(session_id!), { ...session, cdr_id: cdr_id });
-                    batch.set(db.collection("nx-charge-cdrs").doc(cdr_id), { ...cdr, car_number: session.car_number, nx_updated: session.updated });
+                    const current_cdr = cache_manager.getArrayData("nx-charge-cdrs").find((cdr) => cdr.id === cdr_id);
+                    if (current_cdr?.paid) {
+                        return;
+                    }
+                    const is_charged = await charge_cdr(session as SessionWithId, cdr);
+                    delete session.id;
+                    delete cdr.id;
+                    batch.set(db.collection("nx-charge-sessions").doc(session_id!), { cdr_id: cdr_id }, { merge: true });
+                    batch.set(db.collection("nx-charge-cdrs").doc(cdr_id), {
+                        ...cdr,
+                        car_number: session.car_number,
+                        nx_updated: session.updated,
+                        paid: is_charged,
+                    });
                     debug_result.push({ session_id, cdr_id });
                 }
             }

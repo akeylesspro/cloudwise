@@ -3,8 +3,15 @@ import { get_custom_fb_token } from "../helpers";
 import axios from "axios";
 import { logger } from "akeyless-server-commons/managers";
 import { get_config } from "../cloudwise_api/helpers";
+import { CreditItem } from "akeyless-types-commons";
 
-export const get_car_charge_credit_balance = async (car_number: string): Promise<any> => {
+interface CreditBalance {
+    total: number;
+    filtered_credits: CreditItem[];
+    all_credits: CreditItem[];
+}
+
+export const get_car_charge_credit_balance = async (car_number: string): Promise<CreditBalance> => {
     try {
         const token = await get_custom_fb_token();
         const end_users_url = get_nx_service_urls().end_users;
@@ -23,7 +30,7 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
         return data;
     } catch (error) {
         logger.error("🔴 Error in get_car_charge_credit_balance", error);
-        return 0;
+        return { total: 0, filtered_credits: [], all_credits: [] };
     }
 };
 

@@ -208,7 +208,6 @@ export const parse_session = (session: GetCommandStatusResponse): ParsedSession 
         cost: Number(cost) || 0,
         charging_time_in_seconds: Number(ChargingTimeInSeconds) || 0,
         kwh: Number(kw) || 0,
-        cdr: cdr ? parse_cdr(cdr) : undefined,
         session_id: session_id || "",
     };
 };

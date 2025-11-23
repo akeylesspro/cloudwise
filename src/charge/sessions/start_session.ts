@@ -5,10 +5,10 @@ import { Timestamp } from "firebase-admin/firestore";
 import { get_config, get_location_details, get_session_status_api, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
 import { check_car_charge_credit_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
-import { SendCommandResponse, SessionCommandSettings } from "../cloudwise_api/types";
+import { SessionCommandSettings } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
-import { SessionWithId, stop_session, stop_session_command } from "./stop_session";
+import { stop_session } from "./stop_session";
 
 /// ------------------ start session (main function) ------------------
 export const start_session = async (charging_state_object: ChargingState) => {
@@ -22,22 +22,9 @@ export const start_session = async (charging_state_object: ChargingState) => {
         const command_settings = await get_start_session_settings(charging_state_object);
         /// step 4: send start session command
         session_id = await send_start_session_command(command_settings);
+        /// step 5: update collections
+        await update_collections(command_settings, charging_state_object, car_number, session_id);
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
-        delete command_settings.command;
-        const session: ChargingSession = {
-            ...command_settings,
-            car_number,
-            status: "started",
-            started: Timestamp.now(),
-            updated: Timestamp.now(),
-        };
-        await set_document("nx-charge-sessions", session_id, session);
-        await set_document("nx-charge-state", car_number, {
-            ...charging_state_object,
-            status: "charging",
-            session_id,
-            timestamp: Timestamp.now(),
-        });
         if (car_number === "16457003") {
             send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
         }
@@ -216,6 +203,7 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
     return command_options;
 };
 
+// ------------------ start session command ------------------
 const send_start_session_command = async (command_settings: SessionCommandSettings): Promise<string> => {
     try {
         const request = async () => await session_command(command_settings);
@@ -238,4 +226,28 @@ const debug_session = (session_id: string) => {
         const res = await get_session_status_api({ asset_id, ble_id, session_id, device_id });
         console.log(`debug_session: "${session_id}"`, res);
     }, 5 * 1000);
+};
+
+// ------------------ update collections ------------------
+const update_collections = async (config: SessionCommandSettings, state_object: ChargingState, car_number: string, session_id: string) => {
+    try {
+        delete config.command;
+        const session: ChargingSession = {
+            ...config,
+            car_number,
+            status: "started",
+            started: Timestamp.now(),
+            updated: Timestamp.now(),
+        };
+        await set_document("nx-charge-sessions", session_id, session);
+        await set_document("nx-charge-state", car_number, {
+            ...state_object,
+            status: "charging",
+            session_id,
+            timestamp: Timestamp.now(),
+        });
+    } catch (error) {
+        logger.error(`🔴 Error in update_collections: ${session_id}`, JSON.stringify(error));
+        throw new Error("start_step_5__failed_to_update_collections");
+    }
 };

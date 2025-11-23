@@ -4,7 +4,7 @@ import type { Timestamp } from "firebase-admin/firestore";
 
 type ChargingStateStatus = "plugin" | "charging" | "plugout" | "error" | "completed";
 
-export type SessionStatus = "started" | "completed" | "error";
+export type SessionStatus = "started" | "completed" | "error" | "paid";
 
 export type CommandStatus = "ACTIVE" | "COMPLETED" | "FAILED";
 
@@ -43,13 +43,16 @@ export interface ChargingSession extends Omit<SessionCommandSettings, "command">
     status: SessionStatus;
     message?: string;
     cdr_id?: string;
+    cost?: number;
+    kwh?: number;
 }
+
+export type SessionWithId = ChargingSession & { id: string };
 
 export interface ParsedSession {
     session_status: CommandStatus;
     cost: number;
     charging_time_in_seconds: number;
     kwh: number;
-    cdr?: ParsedCdrItem;
     session_id: string;
 }
