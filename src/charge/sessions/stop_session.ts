@@ -12,7 +12,7 @@ interface StopSessionPayload {
     message: string;
 }
 
-type SessionWithId = ChargingSession & { id: string };
+export type SessionWithId = ChargingSession & { id: string };
 
 export const stop_session = async (session_id: string, options: StopSessionPayload) => {
     const { status = "completed", message } = options;
@@ -21,7 +21,7 @@ export const stop_session = async (session_id: string, options: StopSessionPaylo
         /// step 1: validate session
         const session = validate_session(session_id);
         /// step 2: stop session command
-        await stop_session_command(session_id, session);
+        await stop_session_command(session);
         /// step 3: update collections status
         await update_collections(session, message, status);
         /// step 4: async update session and cdr (if exists)
@@ -40,7 +40,7 @@ const validate_session = (session_id: string): SessionWithId => {
     return session as SessionWithId;
 };
 
-const stop_session_command = async (session_id: string, session: SessionWithId) => {
+export const stop_session_command = async (session: SessionWithId) => {
     try {
         const config: SessionCommandSettings & Partial<ChargingSession> = {
             ...session,
@@ -52,7 +52,7 @@ const stop_session_command = async (session_id: string, session: SessionWithId) 
         delete config.id;
         const request = async () => await session_command(config);
         await retry(request, { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "stop_session" });
-        logger.log(`⛔ Session "${session_id}" stopped`);
+        logger.log(`⛔ Session "${session.id}" stopped`);
     } catch (error) {
         logger.error(`🔴 Error in stop_session_command: ${session.id}`, JSON.stringify(error));
         throw new Error("stop_step_2__failed_to_stop_session_command");

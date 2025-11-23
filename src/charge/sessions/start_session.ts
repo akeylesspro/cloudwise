@@ -2,24 +2,26 @@ import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { EvseStatus, ParsedConnectorData, ParsedOcpiLocationData } from "../types";
 import type { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_config, get_location_details, session_command } from "../cloudwise_api/helpers";
+import { get_config, get_location_details, get_session_status_api, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
 import { check_car_charge_credit_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
 import { SendCommandResponse, SessionCommandSettings } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
+import { SessionWithId, stop_session, stop_session_command } from "./stop_session";
 
 /// ------------------ start session (main function) ------------------
 export const start_session = async (charging_state_object: ChargingState) => {
     const { car_number, lat, lng } = charging_state_object;
     logger.log(`Starting session for car: "${car_number}" ...`, { lat, lng });
+    let session_id: string | undefined;
     try {
         /// step 1: check credit balance
         await check_credit_balance(car_number);
         /// steps 2 & 3: get start session settings (closest location and connector)
         const command_settings = await get_start_session_settings(charging_state_object);
         /// step 4: send start session command
-        const session_id = await send_start_session_command(command_settings);
+        session_id = await send_start_session_command(command_settings);
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         delete command_settings.command;
         const session: ChargingSession = {
@@ -40,19 +42,19 @@ export const start_session = async (charging_state_object: ChargingState) => {
             send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
         }
         ///  interval for test during session
-        // setInterval(async () => {
-        //     const { asset_id, ble_id, device_id } = get_config();
-        //     const res = await get_session_status({ asset_id, ble_id, session_id, device_id });
-        //     console.log("get_session_status", res);
-        // }, 5 * 1000);
+        // debug_session(session_id);
     } catch (error: any) {
         logger.error("🔴 Error in start_session", error);
-        await set_document("nx-charge-state", car_number, {
-            ...charging_state_object,
-            status: "error",
-            timestamp: Timestamp.now(),
-            message: error.message || "unknown error",
-        });
+        if (session_id) {
+            await stop_session(session_id, { message: error.message || "unknown error", status: "error" });
+        } else {
+            await set_document("nx-charge-state", car_number, {
+                ...charging_state_object,
+                status: "error",
+                timestamp: Timestamp.now(),
+                message: error.message || "unknown error",
+            });
+        }
     }
 };
 
@@ -228,4 +230,12 @@ const send_start_session_command = async (command_settings: SessionCommandSettin
         logger.error(`🔴 Error in send_start_session_command: ${JSON.stringify(command_settings)}`, error);
         throw new Error("start_step_4__failed_to_send_send_start_session_command");
     }
+};
+
+const debug_session = (session_id: string) => {
+    setInterval(async () => {
+        const { asset_id, ble_id, device_id } = get_config();
+        const res = await get_session_status_api({ asset_id, ble_id, session_id, device_id });
+        console.log(`debug_session: "${session_id}"`, res);
+    }, 5 * 1000);
 };
