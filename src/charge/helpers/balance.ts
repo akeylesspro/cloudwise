@@ -27,6 +27,9 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
         const {
             data: { data },
         } = response;
+        if (data.total === 0) {
+            logger.error(`🔴 Car "${car_number}" get 0 credits balance`);
+        }
         return data;
     } catch (error) {
         logger.error("🔴 Error in get_car_charge_credit_balance", error);
