@@ -202,7 +202,7 @@ export const parse_cdr = (cdr: CdrItem): ParsedCdrItem => {
 };
 
 export const parse_session = (session: GetCommandStatusResponse): ParsedSession => {
-    const { CommandStatus: session_status, Cost: cost, ChargingTimeInSeconds, KWh: kw, Cdr: cdr, CommandId: session_id, } = session;
+    const { CommandStatus: session_status, Cost: cost, ChargingTimeInSeconds, Kwh: kw, CommandId: session_id } = session;
     return {
         session_status,
         cost: Number(cost) || 0,

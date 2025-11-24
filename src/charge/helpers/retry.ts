@@ -56,7 +56,12 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
                 }
             }
             if (debug) {
-                logger.log(`✅ Retry for ${name} success after ${attempt} attempts`);
+                if (attempt > 1) {
+                    logger.log(`✅ ${name} succeeded after ${attempt} attempts`);
+                }
+                else {
+                    logger.log(`✅ ${name} succeeded on first attempt`);
+                }
             }
             return result;
         } catch (error: any) {

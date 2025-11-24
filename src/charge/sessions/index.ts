@@ -52,10 +52,12 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
                 if (car_number === "16457003") {
                     send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");
                 }
-                start_session(charging_state);
+                if (check_car_charging_features(car_number)) {
+                    start_session(charging_state);
+                }
                 break;
             case "charging":
-                if (charging_state.session_id) {
+                if (check_car_charging_features(car_number) && charging_state.session_id) {
                     logger.log(`🔄 Resuming monitoring for session ${charging_state.session_id}`);
                     handle_active_session(charging_state.session_id, charging_state.car_number);
                 }

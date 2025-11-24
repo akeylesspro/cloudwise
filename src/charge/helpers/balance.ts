@@ -3,7 +3,7 @@ import { get_custom_fb_token } from "../helpers";
 import axios from "axios";
 import { logger } from "akeyless-server-commons/managers";
 import { get_config } from "../cloudwise_api/helpers";
-import { CreditItem } from "akeyless-types-commons";
+import { CreditItem, TObject } from "akeyless-types-commons";
 
 interface CreditBalance {
     total: number;
@@ -51,7 +51,7 @@ export interface SubtractActionPayload {
     amount: number;
 }
 
-export const subtract_credit_balance = async (args: SubtractActionPayload): Promise<number> => {
+export const subtract_credit_balance = async (args: SubtractActionPayload): Promise<TObject<any> | null> => {
     try {
         const token = await get_custom_fb_token();
         const end_users_url = get_nx_service_urls().end_users;
@@ -68,10 +68,9 @@ export const subtract_credit_balance = async (args: SubtractActionPayload): Prom
         const {
             data: { data },
         } = response;
-        const { total } = data;
-        return total.toFixed(2);
+        return data;
     } catch (error) {
-        logger.error("🔴 Error in get_car_charge_credit_balance", error);
-        return 0;
+        logger.error("🔴 Error in subtract_credit_balance", error);
+        return null;
     }
 };

@@ -91,7 +91,7 @@ export interface GetCommandStatusResponse extends CloudwiseResponse {
     ChargingTimeInSeconds: string;
     CommandId?: string;
     SessionId?: string;
-    KWh?: string;
+    Kwh?: string;
     Cost?: string;
     Cdr?: CdrItem;
 }

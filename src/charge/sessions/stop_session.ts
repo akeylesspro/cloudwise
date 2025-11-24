@@ -88,7 +88,7 @@ const get_session_cdr = (session: SessionWithId) => {
                 CommandStatus: session_status,
                 Cost: cost = 0,
                 Count: count = 0,
-                KWh: kwh = 0,
+                Kwh: kwh = 0,
                 ChargingTimeInSeconds: charging_time_in_seconds,
                 Cdr: cdr,
             } = await get_session_status_api({ asset_id, ble_id, session_id: session.id, device_id });

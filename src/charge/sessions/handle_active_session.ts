@@ -58,6 +58,7 @@ const get_session_status = async (session_id: string): Promise<ParsedSession> =>
             name: "get_session_status_api",
         });
         const { cost, kwh, charging_time_in_seconds } = parse_session(session);
+        logger.log(`🟢 get_session_status_api: ${session_id}`, { kwh, cost, charging_time_in_seconds });
         set_document("nx-charge-sessions", session_id, { kwh, cost, charging_time_in_seconds });
         return parse_session(session);
     } catch (error) {
