@@ -13,32 +13,31 @@ export * from "./handle_active_session";
 
 export const handle_charging_state_snapshot = (charging_states: ChargingState[]) => {
     let prev: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
-    charging_states.forEach((new_car) => {
-        const old_car = prev.find((old) => old.car_number === new_car.car_number);
-        if (!old_car) {
-            if (check_car_charging_features(new_car.car_number)) {
-                logger.log(`🟢 new car: "${new_car.car_number}" entered with status: "${new_car.status}"`);
-                handle_car_status_change(new_car);
+    charging_states.forEach(async (new_state) => {
+        const prev_state = prev.find((old) => old.car_number === new_state.car_number);
+        if (!prev_state) {
+            if (check_feature(new_state.car_number)) {
+                logger.log(`🟢 new state: "${new_state.car_number}" entered with status: "${new_state.status}"`);
+                handle_status_change(new_state);
             }
-            prev = [...prev, new_car];
+            prev = [...prev, new_state];
             return;
         }
-        const [old_status, new_status] = [old_car.status, new_car.status];
+        const [old_status, new_status] = [prev_state.status, new_state.status];
         if (old_status !== new_status) {
-            if (old_status === "charging" && new_status === "plugin") {
+            if (new_state.session_id && new_status === "plugin") {
                 logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
                 // Check if there's an active session that should be stopped
-                if (new_car.session_id) {
-                    stop_session(new_car.session_id, { message: "Invalid state transition detected", status: "error" });
+                if (new_state.session_id) {
+                    await stop_session(new_state.session_id, { message: "Invalid state transition detected", status: "error" });
                 }
-                return;
             }
-            if (check_car_charging_features(new_car.car_number)) {
-                logger.log(`ℹ️ car: "${new_car.car_number}" got status changed from "${old_status}" to "${new_status}"`);
-                handle_car_status_change(new_car);
+            if (check_feature(new_state.car_number)) {
+                logger.log(`ℹ️ state: "${new_state.car_number}" got status changed from "${old_status}" to "${new_status}"`);
+                handle_status_change(new_state);
             }
         }
-        prev = prev.map((old) => (old.car_number === new_car.car_number ? new_car : old));
+        prev = prev.map((old) => (old.car_number === new_state.car_number ? new_state : old));
     });
     cache_manager.setArrayData("nx-charge-state", prev);
 };
@@ -52,12 +51,12 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
                 if (car_number === "16457003") {
                     send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");
                 }
-                if (check_car_charging_features(car_number)) {
+                if (check_feature(car_number)) {
                     start_session(charging_state);
                 }
                 break;
             case "charging":
-                if (check_car_charging_features(car_number) && charging_state.session_id) {
+                if (check_feature(car_number) && charging_state.session_id) {
                     logger.log(`🔄 Resuming monitoring for session ${charging_state.session_id}`);
                     handle_active_session(charging_state.session_id, charging_state.car_number);
                 }
@@ -68,7 +67,7 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
     }
 };
 
-const handle_car_status_change = async (charging_state_object: ChargingState) => {
+const handle_status_change = async (charging_state_object: ChargingState) => {
     const { status, car_number } = charging_state_object;
     switch (status) {
         case "plugin":
@@ -90,12 +89,12 @@ const handle_car_status_change = async (charging_state_object: ChargingState) =>
     }
 };
 
-const check_car_charging_features = (car_number: string): boolean => {
+const check_feature = (car_number: string): boolean => {
     const units: Car[] = cache_manager.getArrayData("units");
     const car = units.find((car) => car.carId.trim() === car_number.trim());
     if (!car) {
         return false;
     }
     const car_features = car.features || [];
-    return car_features.includes("charge") && car_features.includes("plug_and_charge");
+    return car_features.includes("plug_and_charge");
 };

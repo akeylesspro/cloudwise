@@ -1,4 +1,4 @@
-import { SessionCommandSettings } from "../cloudwise_api/types";
+import { SessionCommandConfig } from "../cloudwise_api/types";
 import { EvseStatus, ParsedCdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
 import type { Timestamp } from "firebase-admin/firestore";
 
@@ -34,7 +34,7 @@ export interface ClosestUpdatedLocationResult {
     connector: ParsedConnectorData;
 }
 
-export interface ChargingSession extends Omit<SessionCommandSettings, "command"> {
+export interface ChargingSession extends Omit<SessionCommandConfig, "command"> {
     id?: string;
     car_number: string;
     updated: Timestamp;

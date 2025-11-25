@@ -1,9 +1,9 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_session_status_api, get_config, session_command } from "../cloudwise_api/helpers";
+import { get_session_status, get_config, session_command } from "../cloudwise_api/helpers";
 import { get_car_charge_credit_balance, parse_cdr, subtract_credit_balance } from "../helpers";
 import type { ChargingSession, SessionWithId } from "./types";
-import { SessionCommandSettings } from "../cloudwise_api/types";
+import { SessionCommandConfig } from "../cloudwise_api/types";
 import { set_document } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 import { ParsedCdrItem } from "../types";
@@ -47,7 +47,7 @@ const validate_session = (session_id: string): SessionWithId => {
 
 export const stop_session_command = async (session: SessionWithId) => {
     try {
-        const config: SessionCommandSettings & Partial<ChargingSession> = {
+        const config: SessionCommandConfig & Partial<ChargingSession> = {
             ...session,
             command: "STOP_SESSION",
             session_id: session.id,
@@ -91,7 +91,7 @@ const get_session_cdr = (session: SessionWithId) => {
                 Kwh: kwh = 0,
                 ChargingTimeInSeconds: charging_time_in_seconds,
                 Cdr: cdr,
-            } = await get_session_status_api({ asset_id, ble_id, session_id: session.id, device_id });
+            } = await get_session_status({ asset_id, ble_id, session_id: session.id, device_id });
 
             if (session_status.includes("COMPLETED")) {
                 const update: any = { cost, count, kwh, charging_time_in_seconds, updated: Timestamp.now() };

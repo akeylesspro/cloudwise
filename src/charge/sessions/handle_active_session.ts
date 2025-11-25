@@ -1,5 +1,5 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
-import { get_config, get_session_status_api } from "../cloudwise_api/helpers";
+import { get_config, get_session_status } from "../cloudwise_api/helpers";
 import { retry } from "../helpers/retry";
 import { send_sms, set_document } from "akeyless-server-commons/helpers";
 import { stop_session } from "./stop_session";
@@ -24,7 +24,9 @@ export const handle_active_session = async (session_id: string, car_number: stri
     const run = async () => {
         try {
             /// step 1: get session status
-            const { session_status, cost } = await get_session_status(session_id);
+            const session = await get_session_details(session_id);
+            const { session_status, cost } = session;
+            await update_session(session_id, session);
             if (!session_status.includes("ACTIVE")) {
                 clear_timer();
                 return await on_session_completed(session_id, car_number, `Session status is: ${session_status}`);
@@ -47,24 +49,28 @@ export const handle_active_session = async (session_id: string, car_number: stri
     await run();
 };
 
-const get_session_status = async (session_id: string): Promise<ParsedSession> => {
+const get_session_details = async (session_id: string): Promise<ParsedSession> => {
     const { asset_id, ble_id, device_id } = get_config();
     try {
-        const request = async () => await get_session_status_api({ asset_id, ble_id, session_id, device_id });
+        const request = async () => await get_session_status({ asset_id, ble_id, session_id, device_id });
         const session = await retry(request, {
             retries: 4,
             random_delay: { min: 10, max: 20 },
             debug: true,
-            name: "get_session_status_api",
+            name: "get_session_details",
         });
-        const { cost, kwh, charging_time_in_seconds } = parse_session(session);
-        logger.log(`🟢 get_session_status_api: ${session_id}`, { kwh, cost, charging_time_in_seconds });
-        set_document("nx-charge-sessions", session_id, { kwh, cost, charging_time_in_seconds });
+
         return parse_session(session);
     } catch (error) {
-        logger.error("🔴 Error in get_session_status: cannot get session status", error);
-        throw new Error("active_step_1__failed_to_get_session_status");
+        logger.error("🔴 Error in get_session_details: cannot get session details", error);
+        throw new Error("active_step_1__failed_to_get_session_details");
     }
+};
+
+const update_session = async (session_id: string, session: ParsedSession) => {
+    const { cost, kwh, charging_time_in_seconds } = session;
+    logger.log(`🟢 updated session details: ${session_id}`, { kwh, cost, charging_time_in_seconds });
+    await set_document("nx-charge-sessions", session_id, { kwh, cost, charging_time_in_seconds });
 };
 
 const on_session_completed = async (session_id: string, car_number: string, message: string) => {

@@ -57,7 +57,7 @@ export interface GetLocationDetailsResponse extends CloudwiseResponse {
 
 export type SessionCommand = "START_SESSION" | "STOP_SESSION";
 /// send command
-export interface SessionCommandSettings {
+export interface SessionCommandConfig {
     command?: SessionCommand;
     location_id: string;
     party_id?: string;

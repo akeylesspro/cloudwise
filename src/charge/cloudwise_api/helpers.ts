@@ -7,7 +7,7 @@ import {
     GetLocationsResponse,
     GetLocationDetailsOptions,
     GetLocationDetailsResponse,
-    SessionCommandSettings,
+    SessionCommandConfig,
     SendCommandResponse,
     GetSessionStatusOptions,
     GetCommandStatusResponse,
@@ -104,7 +104,7 @@ export const get_location_details = async (
     return Location;
 };
 
-export const session_command = async (settings: SessionCommandSettings): Promise<SendCommandResponse> => {
+export const session_command = async (config: SessionCommandConfig): Promise<SendCommandResponse> => {
     const {
         location_id,
         party_id,
@@ -119,7 +119,7 @@ export const session_command = async (settings: SessionCommandSettings): Promise
         country_code = "IL",
         lat = 0.0,
         lng = 0.0,
-    } = settings || {};
+    } = config || {};
 
     const data = await cloudwise_request<SendCommandResponse>("sendCommand", {
         command,
@@ -140,7 +140,7 @@ export const session_command = async (settings: SessionCommandSettings): Promise
     return data;
 };
 
-export const get_session_status_api = async (options: GetSessionStatusOptions): Promise<GetCommandStatusResponse> => {
+export const get_session_status = async (options: GetSessionStatusOptions): Promise<GetCommandStatusResponse> => {
     const { asset_id, ble_id, session_id, device_id } = options || {};
 
     const data = await cloudwise_request<GetCommandStatusResponse>("getCommandStatus", {

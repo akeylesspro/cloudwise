@@ -2,10 +2,10 @@ import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { EvseStatus, ParsedConnectorData, ParsedOcpiLocationData } from "../types";
 import type { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_config, get_location_details, get_session_status_api, session_command } from "../cloudwise_api/helpers";
+import { get_config, get_location_details, get_session_status, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
 import { check_car_charge_credit_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
-import { SessionCommandSettings } from "../cloudwise_api/types";
+import { SessionCommandConfig } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 import { stop_session } from "./stop_session";
@@ -19,11 +19,11 @@ export const start_session = async (charging_state_object: ChargingState) => {
         /// step 1: check credit balance
         await check_credit_balance(car_number);
         /// steps 2 & 3: get start session settings (closest location and connector)
-        const command_settings = await get_start_session_settings(charging_state_object);
+        const command_config = await get_start_session_config(charging_state_object);
         /// step 4: send start session command
-        session_id = await send_start_session_command(command_settings);
+        session_id = await send_start_session_command(command_config);
         /// step 5: update collections
-        await update_collections(command_settings, charging_state_object, car_number, session_id);
+        await update_collections(command_config, charging_state_object, car_number, session_id);
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         if (car_number === "16457003") {
             send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
@@ -176,8 +176,7 @@ const get_last_updated_location = (
     }
 };
 
-const get_start_session_settings = async (charging_state_object: ChargingState): Promise<SessionCommandSettings> => {
-    const { timestamp } = charging_state_object;
+const get_start_session_config = async (charging_state_object: ChargingState): Promise<SessionCommandConfig> => {
     /// locations with distance less than "radius_in_meters" and with statuses: BLOCKED, PREPARING
     const closest_locations = await get_closest_locations(charging_state_object);
     /// get the location that match the closest updated time
@@ -185,12 +184,12 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
         location,
         station: { uid: station_uid },
         connector: { id: connector_id },
-    } = get_last_updated_location(closest_locations, timestamp);
+    } = get_last_updated_location(closest_locations, charging_state_object.timestamp);
     const { party_id, id: location_id } = location;
 
     logger.log(`🟢 Closest updated location found: ${JSON.stringify(location)}`);
     const { asset_id, ble_id, device_id } = get_config();
-    const command_options: SessionCommandSettings = {
+    const command_config: SessionCommandConfig = {
         asset_id,
         ble_id,
         device_id,
@@ -200,11 +199,11 @@ const get_start_session_settings = async (charging_state_object: ChargingState):
         connector_id,
         command: "START_SESSION",
     };
-    return command_options;
+    return command_config;
 };
 
 // ------------------ start session command ------------------
-const send_start_session_command = async (command_settings: SessionCommandSettings): Promise<string> => {
+const send_start_session_command = async (command_settings: SessionCommandConfig): Promise<string> => {
     try {
         const request = async () => await session_command(command_settings);
         const request_config = { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "send_start_session_command" };
@@ -223,13 +222,13 @@ const send_start_session_command = async (command_settings: SessionCommandSettin
 const debug_session = (session_id: string) => {
     setInterval(async () => {
         const { asset_id, ble_id, device_id } = get_config();
-        const res = await get_session_status_api({ asset_id, ble_id, session_id, device_id });
+        const res = await get_session_status({ asset_id, ble_id, session_id, device_id });
         console.log(`debug_session: "${session_id}"`, res);
     }, 5 * 1000);
 };
 
 // ------------------ update collections ------------------
-const update_collections = async (config: SessionCommandSettings, state_object: ChargingState, car_number: string, session_id: string) => {
+const update_collections = async (config: SessionCommandConfig, state_object: ChargingState, car_number: string, session_id: string) => {
     try {
         delete config.command;
         const session: ChargingSession = {
