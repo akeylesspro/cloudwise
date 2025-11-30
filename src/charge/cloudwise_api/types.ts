@@ -15,6 +15,7 @@ export type CloudwiseConfig = {
     radius_in_meters: number;
     task_collect_cdr_debug: boolean;
     credit_balance_threshold: number;
+    black_list: string[];
 };
 
 export interface CloudwiseResponse {

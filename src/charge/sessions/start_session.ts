@@ -28,6 +28,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
         if (car_number === "16457003") {
             send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
         }
+        return session_id;
         ///  interval for test during session
         // debug_session(session_id);
     } catch (error: any) {
@@ -125,8 +126,8 @@ const get_last_updated_location = (
     statuses: EvseStatus[] = ["BLOCKED", "PREPARING"]
 ): ClosestUpdatedLocationResult => {
     try {
-        const { minimum_time_difference_of_plugin_in_seconds } = get_config();
-        const threshold_ms = minimum_time_difference_of_plugin_in_seconds * 1000;
+        // const { minimum_time_difference_of_plugin_in_seconds } = get_config();
+        // const threshold_ms = minimum_time_difference_of_plugin_in_seconds * 1000;
         let closestDiff = Number.POSITIVE_INFINITY;
         let closestResult: ClosestUpdatedLocationResult | null = null;
 
@@ -137,13 +138,25 @@ const get_last_updated_location = (
                 return connectors.find((connector) => connector.standard !== "CHADEMO") || connectors[0];
             }
         };
-
+        if (locations.length === 1) {
+            const filtered_stations = locations[0].stations.filter((station) => statuses.includes(station.status));
+            if (filtered_stations.length === 1) {
+                closestResult = {
+                    location: locations[0],
+                    station: filtered_stations[0],
+                    last_updated: moment(filtered_stations[0].last_updated.toDate()).format("YYYY-MM-DD HH:mm:ss"),
+                    connector: get_session_connector(filtered_stations[0].connectors),
+                };
+                return closestResult;
+            }
+        }
         locations.forEach((location) => {
             location.stations
                 .filter((station) => statuses.includes(station.status))
                 .forEach((station) => {
                     const diff = Math.abs(timestamp.toMillis() - station.last_updated.toMillis());
-                    if (diff <= threshold_ms && diff < closestDiff) {
+                    // if (diff <= threshold_ms && diff < closestDiff) {
+                    if (diff < closestDiff) {
                         closestDiff = diff;
                         closestResult = {
                             location,

@@ -8,6 +8,14 @@ import { check_car_charge_credit_balance, parse_session } from "../helpers";
 
 const active_timers = new Map<string, NodeJS.Timeout>();
 
+export const stop_active_session_monitoring = (session_id: string): void => {
+    const existing_timer = active_timers.get(session_id);
+    if (existing_timer) {
+        clearTimeout(existing_timer);
+        active_timers.delete(session_id);
+    }
+};
+
 export const handle_active_session = async (session_id: string, car_number: string) => {
     const existing_timer = active_timers.get(session_id);
     if (existing_timer) {

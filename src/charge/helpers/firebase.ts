@@ -28,7 +28,7 @@ export const get_custom_fb_token = async (): Promise<string> => {
 };
 
 export const initialize_snapshot = async () => {
-    await snapshot_bulk_by_names(["units", "nx-charge-locations", "nx-charge-cdrs", "nx-charge-sessions"], { subscription_type: "redis" });
+    await snapshot_bulk_by_names(["units", "nx-charge-locations", "nx-charge-cdrs", "nx-charge-sessions"], { subscription_type: "firebase" });
     await redis_snapshots_bulk([
         {
             collection_name: "nx-charge-state",

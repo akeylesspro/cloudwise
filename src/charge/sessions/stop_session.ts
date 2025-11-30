@@ -7,6 +7,7 @@ import { SessionCommandConfig } from "../cloudwise_api/types";
 import { set_document } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 import { ParsedCdrItem } from "../types";
+import { stop_active_session_monitoring } from "./handle_active_session";
 
 interface StopSessionPayload {
     status?: "completed" | "error";
@@ -16,6 +17,7 @@ interface StopSessionPayload {
 export const stop_session = async (session_id: string, options: StopSessionPayload) => {
     const { status = "completed", message } = options;
     logger.log(`⛔ Stopping session: "${session_id}" with message: "${message}" ...`);
+    stop_active_session_monitoring(session_id);
     try {
         let final_status: StopSessionPayload["status"] | "paid" = status;
         /// step 1: validate session
@@ -24,6 +26,7 @@ export const stop_session = async (session_id: string, options: StopSessionPaylo
         await stop_session_command(session);
         /// step 3: charge session
         const is_charged = await charge_session(session);
+
         if (is_charged) {
             final_status = "paid";
         }
@@ -31,6 +34,7 @@ export const stop_session = async (session_id: string, options: StopSessionPaylo
         await update_collections(session, message, final_status);
         /// step 5: async update session and cdr (if exists)
         get_session_cdr(session);
+        logger.log(`⛔ Session "${session.id}" operation completed successfully`);
     } catch (error) {
         logger.error(`🔴 Error in stop session: ${session_id}`, JSON.stringify(error));
     }
@@ -67,7 +71,6 @@ export const stop_session_command = async (session: SessionWithId) => {
 const update_collections = async (session: SessionWithId, message: string, status: StopSessionPayload["status"] | "paid") => {
     try {
         await set_document("nx-charge-sessions", session.id, {
-            ...session,
             status,
             updated: Timestamp.now(),
             ended: Timestamp.now(),
@@ -115,14 +118,16 @@ const get_session_cdr = (session: SessionWithId) => {
             logger.error(`🔴 Error in get_session_cdr: ${session.id}`, JSON.stringify(error));
             throw new Error("stop_step_5__failed_to_get_session_cdr");
         }
-    }, 30 * 1000);
+    }, 20 * 1000);
 };
 
 const charge_session = async (session: SessionWithId): Promise<boolean> => {
     const { car_number, cost = 0 } = session;
     if (cost === 0) {
+        logger.log(`🔴 Session "${session.id}" cost is 0, skipping charge`);
         return true;
     }
+    logger.log(`🔵 Charging Session: ${session.id} with cost: ${cost}`, { car_number, cost });
     try {
         await charge_credit(car_number, cost);
         return true;
@@ -145,9 +150,7 @@ export const charge_cdr = async (session: SessionWithId, cdr: ParsedCdrItem): Pr
     if (cost === 0) {
         return true;
     }
-    if (cost < 0) {
-        // TODO: update positive credit balance if needed
-    }
+    logger.log(`🔵 Charging CDR: ${session.id} with cost: ${cost}`, { session_status, cost, session_cost, cdr_cost });
     try {
         await charge_credit(car_number, cost);
         if (session_status !== "paid") {

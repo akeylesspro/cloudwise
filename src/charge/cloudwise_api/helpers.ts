@@ -101,6 +101,8 @@ export const get_location_details = async (
         PartyID: party_id,
         CountryCode: country_code,
     });
+    logger.log("get_location_details payload: ", { LocationId: locationId, PartyID: party_id, CountryCode: country_code });
+    logger.log(`get_location_details response: "${locationId}"`, Location);
     return Location;
 };
 
