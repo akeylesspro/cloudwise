@@ -30,6 +30,7 @@ export const stop_session = async (session_id: string, options: StopSessionPaylo
         if (is_charged) {
             final_status = "paid";
         }
+        session.status = final_status;
         /// step 4: update collections status
         await update_collections(session, message, final_status);
         /// step 5: async update session and cdr (if exists)
@@ -95,7 +96,6 @@ const get_session_cdr = (session: SessionWithId) => {
                 ChargingTimeInSeconds: charging_time_in_seconds,
                 Cdr: cdr,
             } = await get_session_status({ asset_id, ble_id, session_id: session.id, device_id });
-
             if (session_status.includes("COMPLETED")) {
                 const update: any = { cost, count, kwh, charging_time_in_seconds, updated: Timestamp.now() };
                 if (cdr) {

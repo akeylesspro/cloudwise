@@ -1,7 +1,8 @@
+import { Timestamp } from "firebase-admin/firestore";
 import { cache_manager } from "akeyless-server-commons/managers";
 import { GetCommandStatusResponse, GetLocationDetailsResponse, SendCommandResponse, UserCdrsResponse } from "../cloudwise_api/types";
 import { ChargingSession, ChargingState, CommandStatus } from "../sessions/types";
-import { ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
+import { CdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
 import { simulator_config } from "./";
 import { SessionSimulationConfig } from "./types";
 
@@ -27,12 +28,8 @@ export const set_session_progress_metadata = (session_id: string, metadata: Part
     return updated;
 };
 
-export const get_session_progress_metadata = (session_id: string): SessionProgressMetadata | null => {
+const get_session_progress_metadata = (session_id: string): SessionProgressMetadata | null => {
     return session_progress_metadata.get(session_id) ?? null;
-};
-
-export const clear_mock_state = (): void => {
-    session_progress_metadata.clear();
 };
 
 /// mock location
@@ -234,14 +231,23 @@ export const mock_get_command_status = (payload: any): GetCommandStatusResponse 
 
     const now = new Date();
     const elapsed_seconds = Math.floor((now.getTime() - final_metadata.started_at.getTime()) / 1000);
-    const is_completed = elapsed_seconds >= final_metadata.duration_seconds || session.status === "completed";
+    const is_completed = elapsed_seconds >= final_metadata.duration_seconds || session.status === "completed" || session.status === "paid";
     const charging_time = is_completed ? final_metadata.duration_seconds : elapsed_seconds;
     const kwh = is_completed
         ? final_metadata.target_kwh
         : Math.min(final_metadata.target_kwh * (elapsed_seconds / final_metadata.duration_seconds), final_metadata.target_kwh);
     const cost = 5 + kwh * 1.4;
 
-    const response: GetCommandStatusResponse = {
+    // Create CDR for completed sessions
+    // Pass a session object with status updated to ensure CDR is created
+    const session_for_cdr: ChargingSession = {
+        ...session,
+        status: is_completed ? (session.status === "paid" ? "paid" : "completed") : session.status,
+        ended: is_completed ? session.ended || Timestamp.now() : session.ended,
+    };
+    const cdr = is_completed ? create_cdr_from_session(session_for_cdr) : null;
+
+    return {
         ErrorCode: 0,
         ErrorMessage: "",
         ErrorProvider: 0,
@@ -255,81 +261,105 @@ export const mock_get_command_status = (payload: any): GetCommandStatusResponse 
         SessionId: session_id,
         Kwh: kwh.toFixed(3),
         Cost: cost.toFixed(2),
+        Cdr: cdr || undefined,
     };
+};
 
-    if (is_completed && session.status === "completed") {
-        const format_duration = (s: number) => {
-            const h = Math.floor(s / 3600)
-                .toString()
-                .padStart(2, "0");
-            const m = Math.floor((s % 3600) / 60)
-                .toString()
-                .padStart(2, "0");
-            const sec = Math.floor(s % 60)
-                .toString()
-                .padStart(2, "0");
-            return `${h}:${m}:${sec}`;
-        };
-        response.Cdr = {
-            OcpCountryCode: "IL",
-            OcpPartyId: session.party_id || "MOCK",
-            Id: `cdr-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-            StartDateTime: final_metadata.started_at.toISOString(),
-            EndDateTime: new Date().toISOString(),
-            SessionId: session_id,
-            AuthMethod: "AUTH_REQUEST",
-            AuthorizationReference: null,
-            Currency: "ILS",
-            TotalCost: cost,
-            TotalCostWithVat: cost * 1.17,
-            TotalCostExcVat: cost,
-            TotalFixCost: 5,
-            TotalFixCostWithVat: 5.85,
-            TotalEnergy: final_metadata.target_kwh,
-            TotalEnergyCost: cost - 5,
-            TotalEnergyCostWithVat: (cost - 5) * 1.17,
-            TotalTime: final_metadata.duration_seconds,
-            TotalTimeCost: null,
-            TotalTimeCostWithVat: null,
-            TotalParkingTime: null,
-            TotalParkingCost: null,
-            TotalParkingCostWithVat: null,
-            TotalReservationCost: null,
-            TotalReservationCostWithVat: null,
-            CdrTokenCountryCode: "IL",
-            CdrTokenPartyId: session.party_id || "MOCK",
-            CdrTokenUid: session.car_number || null,
-            CdrTokenType: "RFID",
-            CdrTokenContractId: null,
-            InvoiceReferenceId: null,
-            CreditsBalance: null,
-            CreditsExpirationDate: null,
-            Credit: false,
-            CreditReferenceId: null,
-            HomeCharging: false,
-            LastUpdated: new Date().toISOString(),
-            AvgKwhPrice: final_metadata.target_kwh === 0 ? 0 : cost / final_metadata.target_kwh,
-            Duration: format_duration(final_metadata.duration_seconds),
-        };
+const create_cdr_from_session = (session: ChargingSession): CdrItem | null => {
+    if (!session.id) {
+        return null;
     }
 
-    return response;
+    const metadata = get_session_progress_metadata(session.id);
+    if (!metadata) {
+        return null;
+    }
+
+    // Only return CDR for completed sessions
+    if (session.status !== "completed" && session.status !== "paid" && !session.ended) {
+        return null;
+    }
+
+    const format_duration = (s: number) => {
+        const h = Math.floor(s / 3600)
+            .toString()
+            .padStart(2, "0");
+        const m = Math.floor((s % 3600) / 60)
+            .toString()
+            .padStart(2, "0");
+        const sec = Math.floor(s % 60)
+            .toString()
+            .padStart(2, "0");
+        return `${h}:${m}:${sec}`;
+    };
+
+    const end_time = session.ended ? session.ended.toDate() : new Date();
+    const kwh = metadata.target_kwh;
+    const cost = 5 + kwh * 1.4;
+
+    return {
+        OcpCountryCode: "IL",
+        OcpPartyId: session.party_id || "MOCK",
+        Id: `cdr-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        StartDateTime: metadata.started_at.toISOString(),
+        EndDateTime: end_time.toISOString(),
+        SessionId: session.id,
+        AuthMethod: "AUTH_REQUEST",
+        AuthorizationReference: null,
+        Currency: "ILS",
+        TotalCost: cost,
+        TotalCostWithVat: cost * 1.17,
+        TotalCostExcVat: cost,
+        TotalFixCost: 5,
+        TotalFixCostWithVat: 5.85,
+        TotalEnergy: kwh,
+        TotalEnergyCost: cost - 5,
+        TotalEnergyCostWithVat: (cost - 5) * 1.17,
+        TotalTime: metadata.duration_seconds,
+        TotalTimeCost: null,
+        TotalTimeCostWithVat: null,
+        TotalParkingTime: null,
+        TotalParkingCost: null,
+        TotalParkingCostWithVat: null,
+        TotalReservationCost: null,
+        TotalReservationCostWithVat: null,
+        CdrTokenCountryCode: "IL",
+        CdrTokenPartyId: session.party_id || "MOCK",
+        CdrTokenUid: session.car_number || null,
+        CdrTokenType: "RFID",
+        CdrTokenContractId: null,
+        InvoiceReferenceId: null,
+        CreditsBalance: null,
+        CreditsExpirationDate: null,
+        Credit: false,
+        CreditReferenceId: null,
+        HomeCharging: false,
+        LastUpdated: new Date().toISOString(),
+        AvgKwhPrice: kwh === 0 ? 0 : cost / kwh,
+        Duration: format_duration(metadata.duration_seconds),
+    };
 };
 
 export const mock_get_user_cdrs = (payload: any): UserCdrsResponse => {
-    // Read real CDRs from cache (real code handles CDR storage)
     const skip = payload?.skip ?? 0;
     const page_size = payload?.pageSize ?? 999999;
 
-    // For now, return empty - real code should handle CDR retrieval
-    // This is just a mock API response
+    // Get all completed sessions from cache
+    const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions") || [];
+
+    // Create CDRs for all completed sessions
+    const cdrs: CdrItem[] = sessions
+        .map((session) => create_cdr_from_session(session))
+        .filter((cdr): cdr is CdrItem => cdr !== null)
+        .slice(skip, skip + page_size);
+
     return {
         ErrorCode: 0,
         ErrorMessage: "",
         ErrorProvider: 0,
-        Count: 0,
+        Count: cdrs.length,
         RequestID: `mock-req-${Date.now()}`,
         ServerTime: new Date().toISOString(),
-        Items: [],
+        Items: cdrs,
     };
 };

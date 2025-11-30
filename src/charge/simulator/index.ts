@@ -2,21 +2,58 @@ import { Timestamp } from "firebase-admin/firestore";
 import { logger, cache_manager } from "akeyless-server-commons/managers";
 import { set_document, sleep, db, init_env_variables } from "akeyless-server-commons/helpers";
 import { disable_api_interceptor, enable_api_interceptor } from "./api_interceptor";
-import { set_session_progress_metadata, clear_mock_state, create_mock_location } from "./mock_store";
+import { set_session_progress_metadata, create_mock_location } from "./mock_store";
 import { ChargingState } from "../sessions/types";
 import { stop_session } from "../sessions";
 
 import dotenv from "dotenv";
-import { SessionRunnerResult, SessionSimulationConfig, SimulatorConfig } from "./types";
+import { SessionSimulationConfig, SimulatorConfig } from "./types";
 dotenv.config();
 
 export * from "./types";
+
 const { simulator } = init_env_variables();
+
 export const simulator_config: SimulatorConfig = {
     enabled: simulator === "true",
-    default_session_duration_seconds: 120,
+    default_session_duration_seconds: 200,
     default_target_kwh: 12,
-    progress_update_interval_ms: 1000 * 10,
+};
+
+export const run_simulator = async (config: SessionSimulationConfig) => {
+    if (!simulator_config.enabled) {
+        logger.error("Simulator is not enabled");
+        return { session_id: "", completed: false };
+    }
+    try {
+        enable_api_interceptor();
+        logger.log("🤖 Simulator is running ...");
+
+        await trigger_plugin_event(config);
+
+        const session_id = await handle_session(config);
+
+        await finish_session(session_id, config.duration_seconds || simulator_config.default_session_duration_seconds);
+
+        return { session_id, completed: true };
+    } catch (error) {
+        disable_api_interceptor();
+        logger.error(`🤖 Simulator failed to run`, error);
+        return { session_id: "", completed: false };
+    }
+};
+
+const trigger_plugin_event = async (config: SessionSimulationConfig) => {
+    const { car_number, lat = 32.0853, lng = 34.7818 } = config;
+    const charging_state = {
+        status: "plugin",
+        car_number,
+        lat,
+        lng,
+        timestamp: Timestamp.now(),
+    };
+    await set_document("nx-charge-state", car_number, charging_state);
+    create_mock_location(config, charging_state as ChargingState);
 };
 
 const wait_for_session_id = async (car_number: string, max_wait_ms: number = 30000): Promise<string | null> => {
@@ -37,38 +74,16 @@ const wait_for_session_id = async (car_number: string, max_wait_ms: number = 300
     return null;
 };
 
-export const run_simulator = async (config: SessionSimulationConfig) => {
-    if (!simulator_config.enabled) {
-        logger.error("Simulator is not enabled");
-        return { session_id: "", completed: false };
-    }
-    enable_api_interceptor();
-    logger.log("🤖 Simulator is running ...");
+const handle_session = async (config: SessionSimulationConfig) => {
     const {
         car_number,
-        lat = 32.0853,
-        lng = 34.7818,
         duration_seconds = simulator_config.default_session_duration_seconds,
         target_kwh = simulator_config.default_target_kwh,
     } = config;
-
-    const charging_state = {
-        status: "plugin",
-        car_number,
-        lat,
-        lng,
-        timestamp: Timestamp.now(),
-    };
-    await set_document("nx-charge-state", car_number, charging_state);
-
-    create_mock_location(config, charging_state as ChargingState);
-
     const session_id = await wait_for_session_id(car_number);
 
     if (!session_id) {
-        disable_api_interceptor();
-        logger.error(`🤖 Simulator failed to retrieve session_id for car: "${car_number}"`);
-        return { session_id: "", completed: false };
+        throw new Error("Simulator failed to retrieve session_id");
     }
     set_session_progress_metadata(session_id, {
         started_at: new Date(),
@@ -76,11 +91,15 @@ export const run_simulator = async (config: SessionSimulationConfig) => {
         duration_seconds,
     });
     logger.log(`🤖 Simulator Session "${session_id}" started successfully`);
+    return session_id;
+};
+
+const finish_session = async (session_id: string, duration_seconds: number) => {
     await sleep(duration_seconds * 1000);
+
     await stop_session(session_id, { message: "Simulator completion", status: "completed" });
     // wait for CDR
-    await sleep(30 * 1000);
+    await sleep(50 * 1000);
     disable_api_interceptor();
     logger.log("🤖 Simulator completed");
-    return { session_id, completed: true };
 };
