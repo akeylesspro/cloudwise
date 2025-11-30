@@ -7,6 +7,7 @@ import { cache_manager } from "akeyless-server-commons/managers";
 import { logger } from "akeyless-server-commons/managers";
 import { Car } from "akeyless-types-commons";
 import { get_config } from "../cloudwise_api/helpers";
+import { simulator_config } from "../simulator";
 
 export * from "./start_session";
 export * from "./stop_session";
@@ -101,11 +102,16 @@ const check_feature = (car_number: string): boolean => {
     return car_features.includes("plug_and_charge");
 };
 
-const check_black_list = (car_number: string): boolean => {
+const simulator_check = (car_number: string): boolean => {
+    if (simulator_config.enabled) {
+        return true;
+    }
     const { black_list } = get_config();
     return !black_list.includes(car_number);
 };
 
 const check_permissions = (car_number: string): boolean => {
-    return check_feature(car_number) && check_black_list(car_number);
+    const simulator =  simulator_check(car_number)
+    const feature = check_feature(car_number)
+    return feature && simulator;
 };

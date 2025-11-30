@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { auth, init_env_variables, redis_snapshots_bulk, snapshot_bulk_by_names } from "akeyless-server-commons/helpers";
 import { cache_manager } from "akeyless-server-commons/managers";
 import { handle_charging_state_snapshot, on_snapshot_first_time } from "../sessions";
+import { snapshot_subscription_type } from "../../app";
 
 dotenv.config();
 
@@ -32,7 +33,7 @@ export const initialize_snapshot = async () => {
     await redis_snapshots_bulk([
         {
             collection_name: "nx-charge-state",
-            subscription_type: "redis",
+            subscription_type: snapshot_subscription_type,
             on_first_time: on_snapshot_first_time,
             on_add: handle_charging_state_snapshot,
             on_modify: handle_charging_state_snapshot,
