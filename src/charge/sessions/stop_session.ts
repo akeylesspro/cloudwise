@@ -127,7 +127,6 @@ const charge_session = async (session: SessionWithId): Promise<boolean> => {
         logger.log(`🔴 Session "${session.id}" cost is 0, skipping charge`);
         return true;
     }
-    logger.log(`🔵 Charging Session: ${session.id} with cost: ${cost}`, { car_number, cost });
     try {
         await charge_credit(car_number, cost);
         return true;
@@ -150,7 +149,6 @@ export const charge_cdr = async (session: SessionWithId, cdr: ParsedCdrItem): Pr
     if (cost === 0) {
         return true;
     }
-    logger.log(`🔵 Charging CDR: ${session.id} with cost: ${cost}`, { session_status, cost, session_cost, cdr_cost });
     try {
         await charge_credit(car_number, cost);
         if (session_status !== "paid") {

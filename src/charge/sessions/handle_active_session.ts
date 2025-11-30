@@ -77,7 +77,6 @@ const get_session_details = async (session_id: string): Promise<ParsedSession> =
 
 const update_session = async (session_id: string, session: ParsedSession) => {
     const { cost, kwh, charging_time_in_seconds } = session;
-    logger.log(`🟢 updated session details: ${session_id}`, { kwh, cost, charging_time_in_seconds });
     await set_document("nx-charge-sessions", session_id, { kwh, cost, charging_time_in_seconds });
 };
 
