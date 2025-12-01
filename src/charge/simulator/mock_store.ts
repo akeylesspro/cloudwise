@@ -2,7 +2,8 @@ import { Timestamp } from "firebase-admin/firestore";
 import { cache_manager } from "akeyless-server-commons/managers";
 import { GetCommandStatusResponse, GetLocationDetailsResponse, SendCommandResponse, UserCdrsResponse } from "../cloudwise_api/types";
 import { ChargingSession, ChargingState, CommandStatus } from "../sessions/types";
-import { CdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
+import { CdrItem, Connector, Evse, Location, ParsedOcpiLocationData } from "../types";
+import { parse_eves, parse_location } from "../helpers/parsers";
 import { simulator_config } from "./";
 import { SessionSimulationConfig } from "./types";
 
@@ -32,53 +33,189 @@ const get_session_progress_metadata = (session_id: string): SessionProgressMetad
     return session_progress_metadata.get(session_id) ?? null;
 };
 
-/// mock location
-export const create_mock_location = (config: SessionSimulationConfig, charging_state: ChargingState): ParsedOcpiLocationData => {
-    const { lat = 32.0853, lng = 34.7818, location_id = "mock-loc-1", party_id = "MOCK" } = config;
-    // Use charging_state timestamp for last_updated to match the plugin time
-    const station_last_updated = charging_state.timestamp;
+type LocationStateInput = Pick<ChargingState, "lat" | "lng" | "timestamp">;
 
-    const mock_connector: ParsedConnectorData = {
-        id: "1",
-        standard: "IEC_62196_T2",
-        format: "SOCKET",
-        power_type: "AC_3_PHASE",
-        max_voltage: 400,
-        max_amperage: 32,
-        max_electric_power: 0,
-        last_updated: station_last_updated,
-        tariff_id: "1",
+const DEFAULT_COORDINATES = { lat: 32.0853, lng: 34.7818 };
+const DEFAULT_LOCATION_ID = "mock-loc-1";
+const DEFAULT_PARTY_ID = "MOCK";
+const DEFAULT_COMPANY_NAME = "Mock Company";
+const DEFAULT_COUNTRY_CODE = "IL";
+const DEFAULT_OPERATOR_NAME = "Mock Operator";
+const DEFAULT_OWNER_NAME = "Mock Owner";
+const DEFAULT_CITY = "Tel Aviv";
+const DEFAULT_ADDRESS = "Mock Address";
+const DEFAULT_CURRENCY = "ILS";
+const DEFAULT_CONNECTOR_ID = "1";
+const DEFAULT_TARIFF_ID = "1";
+const DEFAULT_SIMULATOR_CAR = "simulator";
+const NX_LOCATIONS_CACHE_KEY = "nx-charge-locations";
+const NX_SESSIONS_CACHE_KEY = "nx-charge-sessions";
+
+type LocationResponsePayload = GetLocationDetailsResponse["Location"];
+
+const mock_location_payloads = new Map<string, LocationResponsePayload>();
+
+const get_location_cache_key = (location_id: string, party_id: string) => `${party_id}::${location_id}`;
+
+const get_cached_sessions = (): ChargingSession[] => cache_manager.getArrayData(NX_SESSIONS_CACHE_KEY) || [];
+
+const get_cached_locations = (): ParsedOcpiLocationData[] => cache_manager.getArrayData(NX_LOCATIONS_CACHE_KEY) || [];
+
+const upsert_cached_location = (location: ParsedOcpiLocationData) => {
+    const filtered = get_cached_locations().filter((item) => item.id !== location.id);
+    cache_manager.setArrayData(NX_LOCATIONS_CACHE_KEY, [...filtered, location]);
+};
+
+const build_evse_uid = (location_id: string): string => `evse-${location_id}`;
+
+const build_mock_connector = (evse_uid: string, last_updated_iso: string): Connector => ({
+    Id: DEFAULT_CONNECTOR_ID,
+    EvseUid: evse_uid,
+    Standard: "IEC_62196_T2",
+    Format: "SOCKET",
+    PowerType: "AC_3_PHASE",
+    MaxVoltage: 400,
+    MaxAmperage: 32,
+    MaxElectricPower: 0,
+    TermsAndConditions: null,
+    TariffId: DEFAULT_TARIFF_ID,
+    LastUpdated: last_updated_iso,
+    PricePerKwh: 0,
+    ConnectionFee: 0,
+    ParkingFee: 0,
+    TariffDetails: {
+        PricePerKwh: 0,
+        ConnectionFee: 0,
+        ParkingFee: null,
+        Currency: DEFAULT_CURRENCY,
+        TariffItems: [],
+        ErrorMessage: null,
+        ErrorCode: 0,
+    },
+});
+
+const build_mock_evse = (
+    location_id: string,
+    party_id: string,
+    lat: number,
+    lng: number,
+    last_updated_iso: string,
+    connector: Connector
+): Evse => ({
+    Uid: build_evse_uid(location_id),
+    LocationId: location_id,
+    EvseId: `${DEFAULT_COUNTRY_CODE}*${party_id}*E${location_id}*1`,
+    Status: "BLOCKED",
+    FloorLevel: null,
+    Latitude: lat,
+    Longitude: lng,
+    PhysicalReference: null,
+    Directions: null,
+    ParkingRestrictions: null,
+    Images: null,
+    Capabilities: "",
+    LastUpdated: last_updated_iso,
+    Connectors: [connector],
+    Description: [],
+});
+
+const build_mock_location_payload = (config: SessionSimulationConfig, charging_state: LocationStateInput): LocationResponsePayload => {
+    const {
+        lat: config_lat,
+        lng: config_lng,
+        location_id = DEFAULT_LOCATION_ID,
+        party_id = DEFAULT_PARTY_ID,
+    } = config;
+    const lat = config_lat ?? charging_state.lat ?? DEFAULT_COORDINATES.lat;
+    const lng = config_lng ?? charging_state.lng ?? DEFAULT_COORDINATES.lng;
+    const last_updated_iso = charging_state.timestamp.toDate().toISOString();
+    const evse_uid = build_evse_uid(location_id);
+    const connector = build_mock_connector(evse_uid, last_updated_iso);
+    const evse = build_mock_evse(location_id, party_id, lat, lng, last_updated_iso, connector);
+    const location: Location = {
+        Id: location_id,
+        OwnerCountryCode: DEFAULT_COUNTRY_CODE,
+        OwnerPartyId: party_id,
+        Publish: true,
+        Name: "Mock Location",
+        Address: DEFAULT_ADDRESS,
+        City: DEFAULT_CITY,
+        State: "",
+        Country: DEFAULT_COUNTRY_CODE,
+        OperatorName: DEFAULT_OPERATOR_NAME,
+        OwnerName: DEFAULT_OWNER_NAME,
+        Latitude: lat,
+        Longitude: lng,
+        Facilities: null,
+        OpeningTimes: "",
+        ParkingType: "",
+        Images: null,
+        LastUpdated: last_updated_iso,
     };
-
-    const mock_station: ParsedEvseData = {
-        uid: `evse-${location_id}`,
-        status: "BLOCKED",
-        floor_level: null,
-        physical_reference: null,
-        last_updated: station_last_updated,
-        connectors: [mock_connector],
+    return {
+        Location: location,
+        Evses: [evse],
+        ErrorMessage: null,
+        ErrorCode: 0,
     };
+};
 
-    const mock_location: ParsedOcpiLocationData = {
-        name: "Mock Location",
-        id: `${location_id}-${party_id}-IL`,
-        country: "IL",
-        address: "Mock Address",
-        lat,
-        lng,
-        original_id: location_id,
-        company_name: "Mock Company",
+const to_parsed_location = (payload: LocationResponsePayload): ParsedOcpiLocationData => {
+    const parsed_location = parse_location(payload.Location);
+    const party_id = payload.Location.OwnerPartyId || DEFAULT_PARTY_ID;
+    const country = payload.Location.Country || DEFAULT_COUNTRY_CODE;
+    return {
+        ...parsed_location,
+        id: `${parsed_location.id}-${party_id}-${country}`,
+        original_id: parsed_location.id,
+        company_name: DEFAULT_COMPANY_NAME,
         party_id,
-        stations: [mock_station],
+        stations: payload.Evses.map(parse_eves),
     };
-    const existing_locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("nx-charge-locations") || [];
-    cache_manager.setArrayData("nx-charge-locations", [...existing_locations, mock_location]);
-    return mock_location;
+};
+
+const cache_location_payload = (payload: LocationResponsePayload): ParsedOcpiLocationData => {
+    const parsed_location = to_parsed_location(payload);
+    const location_id = payload.Location.Id;
+    const party_id = payload.Location.OwnerPartyId || DEFAULT_PARTY_ID;
+    const cache_key = get_location_cache_key(location_id, party_id);
+    mock_location_payloads.set(cache_key, payload);
+    upsert_cached_location(parsed_location);
+    return parsed_location;
+};
+
+const get_or_create_location_payload = (location_id: string, party_id: string): LocationResponsePayload => {
+    const cache_key = get_location_cache_key(location_id, party_id);
+    const cached = mock_location_payloads.get(cache_key);
+    if (cached) {
+        return cached;
+    }
+    const fallback_state: LocationStateInput = {
+        lat: DEFAULT_COORDINATES.lat,
+        lng: DEFAULT_COORDINATES.lng,
+        timestamp: Timestamp.now(),
+    };
+    const fallback_config: SessionSimulationConfig = {
+        car_number: DEFAULT_SIMULATOR_CAR,
+        location_id,
+        party_id,
+    };
+    const payload = build_mock_location_payload(fallback_config, fallback_state);
+    cache_location_payload(payload);
+    return payload;
+};
+
+/// mock location
+export const create_mock_location = (config: SessionSimulationConfig, charging_state: LocationStateInput): ParsedOcpiLocationData => {
+    const payload = build_mock_location_payload(config, charging_state);
+    return cache_location_payload(payload);
 };
 
 /// api
 export const mock_get_location_details = (payload: any): GetLocationDetailsResponse => {
-    const location_id = payload?.LocationId || "mock-loc-1";
+    const location_id = payload?.LocationId || DEFAULT_LOCATION_ID;
+    const party_id = payload?.PartyID || DEFAULT_PARTY_ID;
+    const location_payload = get_or_create_location_payload(location_id, party_id);
     return {
         ErrorCode: 0,
         ErrorMessage: "",
@@ -86,75 +223,7 @@ export const mock_get_location_details = (payload: any): GetLocationDetailsRespo
         Count: 1,
         RequestID: `mock-req-${Date.now()}`,
         ServerTime: new Date().toISOString(),
-        Location: {
-            Location: {
-                Id: location_id,
-                Name: "Mock Location",
-                Address: "Mock Address",
-                City: "Tel Aviv",
-                Country: "ISR",
-                Latitude: 32.0853,
-                Longitude: 34.7818,
-                OwnerCountryCode: "IL",
-                OwnerPartyId: "MOCK",
-                Publish: true,
-                State: "",
-                OperatorName: "Mock Operator",
-                OwnerName: "Mock Owner",
-                Facilities: null,
-                OpeningTimes: "",
-                ParkingType: "",
-                Images: null,
-                LastUpdated: new Date().toISOString(),
-            },
-            Evses: [
-                {
-                    Uid: `evse-${location_id}`,
-                    LocationId: location_id,
-                    EvseId: `IL*MOCK*E${location_id}*1`,
-                    Status: "BLOCKED",
-                    FloorLevel: null,
-                    Latitude: 32.0853,
-                    Longitude: 34.7818,
-                    PhysicalReference: null,
-                    Directions: null,
-                    ParkingRestrictions: null,
-                    Images: null,
-                    Capabilities: "",
-                    Connectors: [
-                        {
-                            Id: "1",
-                            EvseUid: `evse-${location_id}`,
-                            Standard: "IEC_62196_T2",
-                            Format: "SOCKET",
-                            PowerType: "AC_3_PHASE",
-                            MaxVoltage: 400,
-                            MaxAmperage: 32,
-                            MaxElectricPower: 0,
-                            TermsAndConditions: null,
-                            TariffId: "1",
-                            LastUpdated: new Date().toISOString(),
-                            PricePerKwh: 0,
-                            ConnectionFee: 0,
-                            ParkingFee: 0,
-                            TariffDetails: {
-                                PricePerKwh: 0,
-                                ConnectionFee: 0,
-                                ParkingFee: null,
-                                Currency: "ILS",
-                                TariffItems: [],
-                                ErrorMessage: null,
-                                ErrorCode: 0,
-                            },
-                        },
-                    ],
-                    Description: [],
-                    LastUpdated: new Date().toISOString(),
-                },
-            ],
-            ErrorMessage: null,
-            ErrorCode: 0,
-        },
+        Location: location_payload,
     };
 };
 
@@ -203,7 +272,7 @@ export const mock_get_command_status = (payload: any): GetCommandStatusResponse 
         };
     }
 
-    const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions") || [];
+    const sessions = get_cached_sessions();
     const session = sessions.find((s) => s.id === session_id);
     if (!session) {
         return {
@@ -345,7 +414,7 @@ export const mock_get_user_cdrs = (payload: any): UserCdrsResponse => {
     const page_size = payload?.pageSize ?? 999999;
 
     // Get all completed sessions from cache
-    const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions") || [];
+    const sessions = get_cached_sessions();
 
     // Create CDRs for all completed sessions
     const cdrs: CdrItem[] = sessions

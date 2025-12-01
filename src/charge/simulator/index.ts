@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { logger, cache_manager } from "akeyless-server-commons/managers";
-import { set_document, sleep, db, init_env_variables } from "akeyless-server-commons/helpers";
+import { set_document, sleep, init_env_variables } from "akeyless-server-commons/helpers";
 import { disable_api_interceptor, enable_api_interceptor } from "./api_interceptor";
 import { set_session_progress_metadata, create_mock_location } from "./mock_store";
 import { ChargingState } from "../sessions/types";
@@ -25,8 +25,8 @@ export const run_simulator = async (config: SessionSimulationConfig) => {
         logger.error("Simulator is not enabled");
         return { session_id: "", completed: false };
     }
+    enable_api_interceptor();
     try {
-        enable_api_interceptor();
         logger.log("🤖 Simulator is running ...");
 
         await trigger_plugin_event(config);
@@ -37,15 +37,17 @@ export const run_simulator = async (config: SessionSimulationConfig) => {
 
         return { session_id, completed: true };
     } catch (error) {
-        disable_api_interceptor();
         logger.error(`🤖 Simulator failed to run`, error);
         return { session_id: "", completed: false };
+    } finally {
+        disable_api_interceptor();
     }
 };
 
 const trigger_plugin_event = async (config: SessionSimulationConfig) => {
     const { car_number, lat = 32.0853, lng = 34.7818 } = config;
-    const charging_state = {
+    const charging_state: ChargingState = {
+        id: car_number,
         status: "plugin",
         car_number,
         lat,
@@ -53,7 +55,7 @@ const trigger_plugin_event = async (config: SessionSimulationConfig) => {
         timestamp: Timestamp.now(),
     };
     await set_document("nx-charge-state", car_number, charging_state);
-    create_mock_location(config, charging_state as ChargingState);
+    create_mock_location(config, charging_state);
 };
 
 const wait_for_session_id = async (car_number: string, max_wait_ms: number = 30000): Promise<string | null> => {
@@ -100,6 +102,5 @@ const finish_session = async (session_id: string, duration_seconds: number) => {
     await stop_session(session_id, { message: "Simulator completion", status: "completed" });
     // wait for CDR
     await sleep(50 * 1000);
-    disable_api_interceptor();
     logger.log("🤖 Simulator completed");
 };

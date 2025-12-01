@@ -36,7 +36,7 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
                 }
             }
             if (check_permissions(new_state.car_number)) {
-                logger.log(`ℹ️ state: "${new_state.car_number}" got status changed from "${old_status}" to "${new_status}"`);
+                logger.log(`ℹ️  state: "${new_state.car_number}" got status changed from "${old_status}" to "${new_status}"`);
                 handle_status_change(new_state);
             }
         }
