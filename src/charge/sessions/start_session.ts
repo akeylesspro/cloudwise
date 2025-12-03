@@ -247,6 +247,8 @@ const update_collections = async (config: SessionCommandConfig, state_object: Ch
         const session: ChargingSession = {
             ...config,
             car_number,
+            lat: state_object.lat,
+            lng: state_object.lng,
             status: "started",
             started: Timestamp.now(),
             updated: Timestamp.now(),

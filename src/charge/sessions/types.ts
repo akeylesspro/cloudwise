@@ -36,6 +36,8 @@ export interface ClosestUpdatedLocationResult {
 
 export interface ChargingSession extends Omit<SessionCommandConfig, "command"> {
     id?: string;
+    lat: number;
+    lng: number;
     car_number: string;
     updated: Timestamp;
     started: Timestamp;
