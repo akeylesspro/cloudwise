@@ -51,7 +51,7 @@ export const task__collect_charge_locations = async () => {
 
 export const task__collect_charge_cdrs = async () => {
     const { asset_id, task_collect_cdr_debug } = get_config();
-    const cdrs = await get_user_cdrs({ asset_id });
+    const cdrs = await get_user_cdrs({ asset_id, car_number: "" });
     const parsed_cdrs = cdrs.map(parse_cdr);
     const cached_sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions").filter((session: ChargingSession) => {
         return session.id && session.status !== "started" && !session.cdr_id;

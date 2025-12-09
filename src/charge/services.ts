@@ -6,7 +6,7 @@ import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { ParsedOcpiLocationData } from "./types";
 import { stop_session } from "./sessions";
 import { TObject } from "akeyless-types-commons";
-import { SessionSimulationConfig, run_simulator, simulator_config } from "./simulator";
+import { run_simulator } from "./simulator";
 import { ChargingSession } from "./sessions/types";
 
 export const get_location_status: Service = async (req, res) => {
@@ -18,7 +18,7 @@ export const get_location_status: Service = async (req, res) => {
         if (!location) {
             throw new Error("Location not found");
         }
-        const location_details = await get_location_details(original_id, { party_id: location.party_id });
+        const location_details = await get_location_details(original_id, { party_id: location.party_id, car_number: "" });
         if (!location_details?.Location) {
             throw new Error("Location details not found");
         }
@@ -92,24 +92,13 @@ export const get_locations: Service = async (req, res) => {
 };
 
 export const simulate_session_service: Service = async (req, res) => {
-    const { car_number, lat, lng, duration_seconds, target_kwh, location_id, party_id } = req.body;
     try {
-        const config: SessionSimulationConfig = {
-            car_number,
-            lat: lat ? Number(lat) : undefined,
-            lng: lng ? Number(lng) : undefined,
-            duration_seconds: duration_seconds ? Number(duration_seconds) : undefined,
-            target_kwh: target_kwh ? Number(target_kwh) : undefined,
-            location_id,
-            party_id,
-        };
-        simulator_config.enabled = true;
-        const result = await run_simulator(config);
-        const { simulator: simulator_env } = init_env_variables();
-        simulator_config.enabled = simulator_env === "true";
-        res.json(json_ok({ session_id: result.session_id, completed: result.completed }));
+        run_simulator(req.body).catch((e) => {
+            logger.error(`Error in simulate_session_service, car number: ${req.body.car_number}`, e);
+        });
+        res.json(json_ok({ message: "simulator started" }));
     } catch (error) {
         res.json(json_failed(error));
-        logger.error(`Error in run_simulator, car number: ${car_number}`, error);
+        logger.error(`Error in simulate_session_service, car number: ${req.body.car_number}`, error);
     }
 };

@@ -21,6 +21,7 @@ export interface ChargingState {
 }
 
 export interface GetLocationsByGeoAndStatusOptions {
+    car_number: string;
     lat: number;
     lng: number;
     radius_in_meters: number;

@@ -15,7 +15,7 @@ export type CloudwiseConfig = {
     radius_in_meters: number;
     task_collect_cdr_debug: boolean;
     credit_balance_threshold: number;
-    black_list: string[];
+    simulator_list: string[];
 };
 
 export interface CloudwiseResponse {
@@ -44,6 +44,7 @@ export interface GetLocationsResponse extends CloudwiseResponse {
 /// get location details
 export interface GetLocationDetailsOptions {
     party_id: string;
+    car_number: string;
     country_code?: string;
 }
 
@@ -59,6 +60,7 @@ export interface GetLocationDetailsResponse extends CloudwiseResponse {
 export type SessionCommand = "START_SESSION" | "STOP_SESSION";
 /// send command
 export interface SessionCommandConfig {
+    car_number: string;
     command?: SessionCommand;
     location_id: string;
     party_id?: string;
@@ -80,6 +82,7 @@ export interface SendCommandResponse extends CloudwiseResponse {
 
 /// get command status
 export interface GetSessionStatusOptions {
+    car_number: string;
     session_id: string;
     asset_id: string;
     ble_id: string;
@@ -103,6 +106,7 @@ export interface UserCdrsOptions {
     offset?: number;
     limit?: number;
     time_zone?: number;
+    car_number: string;
 }
 
 export interface UserCdrsResponse extends CloudwiseResponse {

@@ -2,9 +2,9 @@ import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { EvseStatus, ParsedConnectorData, ParsedOcpiLocationData } from "../types";
 import type { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndStatusOptions, ChargingSession } from "./types";
 import { Timestamp } from "firebase-admin/firestore";
-import { get_config, get_location_details, get_session_status, session_command } from "../cloudwise_api/helpers";
+import { get_config, get_location_details, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
-import { check_car_charge_credit_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
+import { is_has_charge_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
 import { SessionCommandConfig } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
@@ -29,8 +29,6 @@ export const start_session = async (charging_state_object: ChargingState) => {
             send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
         }
         return session_id;
-        ///  interval for test during session
-        // debug_session(session_id);
     } catch (error: any) {
         logger.error("🔴 Error in start_session", error);
         if (session_id) {
@@ -47,7 +45,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
 };
 
 const check_credit_balance = async (car_number: string) => {
-    const { is_has_balance } = await check_car_charge_credit_balance(car_number);
+    const { is_has_balance } = await is_has_charge_balance(car_number);
     if (!is_has_balance) {
         logger.error(`🔴 Car "${car_number}" does not have enough balance`);
         throw new Error("start_step_1__failed_to_check_car_charge_credit_balance");
@@ -56,6 +54,7 @@ const check_credit_balance = async (car_number: string) => {
 };
 
 const get_locations_by_geo_and_status = async ({
+    car_number,
     lat,
     lng,
     radius_in_meters,
@@ -74,7 +73,7 @@ const get_locations_by_geo_and_status = async ({
     logger.log(`get_locations_by_geo_and_status: found ${locations_data.length} locations within ${radius_in_meters} meters`);
     const ocpi_locations: ParsedOcpiLocationData[] = [];
     for (const location of locations_data) {
-        const location_details = await get_location_details(location.original_id, { party_id: location.party_id });
+        const location_details = await get_location_details(location.original_id, { party_id: location.party_id, car_number });
         const parsed_location = parse_location(location_details.Location);
         const parsed_evses = location_details.Evses.map(parse_eves);
         ocpi_locations.push({
@@ -96,6 +95,7 @@ const get_closest_locations = async (charging_state_object: ChargingState): Prom
         let { radius_in_meters } = get_config();
         const request = async () =>
             await get_locations_by_geo_and_status({
+                car_number: charging_state_object.car_number,
                 lat,
                 lng,
                 radius_in_meters,
@@ -126,10 +126,8 @@ const get_last_updated_location = (
     statuses: EvseStatus[] = ["BLOCKED", "PREPARING"]
 ): ClosestUpdatedLocationResult => {
     try {
-        // const { minimum_time_difference_of_plugin_in_seconds } = get_config();
-        // const threshold_ms = minimum_time_difference_of_plugin_in_seconds * 1000;
-        let closestDiff = Number.POSITIVE_INFINITY;
-        let closestResult: ClosestUpdatedLocationResult | null = null;
+        let closest_diff = Number.POSITIVE_INFINITY;
+        let closest_result: ClosestUpdatedLocationResult | null = null;
 
         const get_session_connector = (connectors: ParsedConnectorData[]): ParsedConnectorData => {
             if (connectors.length === 1) {
@@ -141,13 +139,13 @@ const get_last_updated_location = (
         if (locations.length === 1) {
             const filtered_stations = locations[0].stations.filter((station) => statuses.includes(station.status));
             if (filtered_stations.length === 1) {
-                closestResult = {
+                closest_result = {
                     location: locations[0],
                     station: filtered_stations[0],
                     last_updated: moment(filtered_stations[0].last_updated.toDate()).format("YYYY-MM-DD HH:mm:ss"),
                     connector: get_session_connector(filtered_stations[0].connectors),
                 };
-                return closestResult;
+                return closest_result;
             }
         }
         locations.forEach((location) => {
@@ -156,9 +154,9 @@ const get_last_updated_location = (
                 .forEach((station) => {
                     const diff = Math.abs(timestamp.toMillis() - station.last_updated.toMillis());
                     // if (diff <= threshold_ms && diff < closestDiff) {
-                    if (diff < closestDiff) {
-                        closestDiff = diff;
-                        closestResult = {
+                    if (diff < closest_diff) {
+                        closest_diff = diff;
+                        closest_result = {
                             location,
                             station,
                             last_updated: moment(station.last_updated.toDate()).format("YYYY-MM-DD HH:mm:ss"),
@@ -167,7 +165,7 @@ const get_last_updated_location = (
                     }
                 });
         });
-        if (!closestResult) {
+        if (!closest_result) {
             const timestamps = locations
                 .map((location) =>
                     location.stations.map((station) => ({
@@ -182,7 +180,7 @@ const get_last_updated_location = (
                 `No closest updated location found, plugin time: ${timestamp_to_string(timestamp as any)}, locations: ${JSON.stringify(timestamps)} `
             );
         }
-        return closestResult;
+        return closest_result;
     } catch (error) {
         logger.error(`🔴 Error in get_last_updated_location`, error);
         throw new Error("start_step_3__failed_to_get_last_updated_location");
@@ -203,6 +201,7 @@ const get_start_session_config = async (charging_state_object: ChargingState): P
     logger.log(`🟢 Closest updated location found: ${JSON.stringify(location)}`);
     const { asset_id, ble_id, device_id } = get_config();
     const command_config: SessionCommandConfig = {
+        car_number: charging_state_object.car_number,
         asset_id,
         ble_id,
         device_id,
@@ -230,14 +229,6 @@ const send_start_session_command = async (command_settings: SessionCommandConfig
         logger.error(`🔴 Error in send_start_session_command: ${JSON.stringify(command_settings)}`, error);
         throw new Error("start_step_4__failed_to_send_send_start_session_command");
     }
-};
-
-const debug_session = (session_id: string) => {
-    setInterval(async () => {
-        const { asset_id, ble_id, device_id } = get_config();
-        const res = await get_session_status({ asset_id, ble_id, session_id, device_id });
-        console.log(`debug_session: "${session_id}"`, res);
-    }, 5 * 1000);
 };
 
 // ------------------ update collections ------------------

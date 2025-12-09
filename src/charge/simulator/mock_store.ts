@@ -5,10 +5,8 @@ import { ChargingSession, ChargingState, CommandStatus } from "../sessions/types
 import { CdrItem, Connector, Evse, Location, ParsedOcpiLocationData } from "../types";
 import { parse_eves, parse_location } from "../helpers/parsers";
 import { simulator_config } from "./";
-import { SessionSimulationConfig } from "./types";
 
 interface SessionProgressMetadata {
-    session_id: string;
     started_at: Date;
     target_kwh: number;
     duration_seconds: number;
@@ -17,13 +15,12 @@ interface SessionProgressMetadata {
 /// mock session progress
 export const session_progress_metadata = new Map<string, SessionProgressMetadata>();
 
-export const set_session_progress_metadata = (session_id: string, metadata: Partial<SessionProgressMetadata>): SessionProgressMetadata => {
+export const set_session_progress_metadata = (session_id: string, metadata: SessionProgressMetadata): SessionProgressMetadata => {
     const existing = session_progress_metadata.get(session_id);
     const updated: SessionProgressMetadata = {
-        session_id,
-        started_at: metadata.started_at ?? existing?.started_at ?? new Date(),
-        target_kwh: metadata.target_kwh ?? existing?.target_kwh ?? simulator_config.default_target_kwh,
-        duration_seconds: metadata.duration_seconds ?? existing?.duration_seconds ?? simulator_config.default_session_duration_seconds,
+        started_at: existing?.started_at ?? metadata.started_at,
+        target_kwh: existing?.target_kwh ?? metadata.target_kwh,
+        duration_seconds: existing?.duration_seconds ?? metadata.duration_seconds,
     };
     session_progress_metadata.set(session_id, updated);
     return updated;
@@ -35,7 +32,7 @@ const get_session_progress_metadata = (session_id: string): SessionProgressMetad
 
 type LocationStateInput = Pick<ChargingState, "lat" | "lng" | "timestamp">;
 
-const DEFAULT_COORDINATES = { lat: 32.0853, lng: 34.7818 };
+export const DEFAULT_COORDINATES = { lat: 32.0853, lng: 34.7818 };
 const DEFAULT_LOCATION_ID = "mock-loc-1";
 const DEFAULT_PARTY_ID = "MOCK";
 const DEFAULT_COMPANY_NAME = "Mock Company";
@@ -47,7 +44,6 @@ const DEFAULT_ADDRESS = "Mock Address";
 const DEFAULT_CURRENCY = "ILS";
 const DEFAULT_CONNECTOR_ID = "1";
 const DEFAULT_TARIFF_ID = "1";
-const DEFAULT_SIMULATOR_CAR = "simulator";
 const NX_LOCATIONS_CACHE_KEY = "nx-charge-locations";
 const NX_SESSIONS_CACHE_KEY = "nx-charge-sessions";
 
@@ -94,14 +90,7 @@ const build_mock_connector = (evse_uid: string, last_updated_iso: string): Conne
     },
 });
 
-const build_mock_evse = (
-    location_id: string,
-    party_id: string,
-    lat: number,
-    lng: number,
-    last_updated_iso: string,
-    connector: Connector
-): Evse => ({
+const build_mock_evse = (location_id: string, party_id: string, lat: number, lng: number, last_updated_iso: string, connector: Connector): Evse => ({
     Uid: build_evse_uid(location_id),
     LocationId: location_id,
     EvseId: `${DEFAULT_COUNTRY_CODE}*${party_id}*E${location_id}*1`,
@@ -119,23 +108,17 @@ const build_mock_evse = (
     Description: [],
 });
 
-const build_mock_location_payload = (config: SessionSimulationConfig, charging_state: LocationStateInput): LocationResponsePayload => {
-    const {
-        lat: config_lat,
-        lng: config_lng,
-        location_id = DEFAULT_LOCATION_ID,
-        party_id = DEFAULT_PARTY_ID,
-    } = config;
-    const lat = config_lat ?? charging_state.lat ?? DEFAULT_COORDINATES.lat;
-    const lng = config_lng ?? charging_state.lng ?? DEFAULT_COORDINATES.lng;
+const build_mock_location_payload = (charging_state: LocationStateInput): LocationResponsePayload => {
+    const lat = DEFAULT_COORDINATES.lat;
+    const lng = DEFAULT_COORDINATES.lng;
     const last_updated_iso = charging_state.timestamp.toDate().toISOString();
-    const evse_uid = build_evse_uid(location_id);
+    const evse_uid = build_evse_uid(DEFAULT_LOCATION_ID);
     const connector = build_mock_connector(evse_uid, last_updated_iso);
-    const evse = build_mock_evse(location_id, party_id, lat, lng, last_updated_iso, connector);
+    const evse = build_mock_evse(DEFAULT_LOCATION_ID, DEFAULT_PARTY_ID, lat, lng, last_updated_iso, connector);
     const location: Location = {
-        Id: location_id,
+        Id: DEFAULT_LOCATION_ID,
         OwnerCountryCode: DEFAULT_COUNTRY_CODE,
-        OwnerPartyId: party_id,
+        OwnerPartyId: DEFAULT_PARTY_ID,
         Publish: true,
         Name: "Mock Location",
         Address: DEFAULT_ADDRESS,
@@ -195,19 +178,15 @@ const get_or_create_location_payload = (location_id: string, party_id: string): 
         lng: DEFAULT_COORDINATES.lng,
         timestamp: Timestamp.now(),
     };
-    const fallback_config: SessionSimulationConfig = {
-        car_number: DEFAULT_SIMULATOR_CAR,
-        location_id,
-        party_id,
-    };
-    const payload = build_mock_location_payload(fallback_config, fallback_state);
+
+    const payload = build_mock_location_payload(fallback_state);
     cache_location_payload(payload);
     return payload;
 };
 
 /// mock location
-export const create_mock_location = (config: SessionSimulationConfig, charging_state: LocationStateInput): ParsedOcpiLocationData => {
-    const payload = build_mock_location_payload(config, charging_state);
+export const create_mock_location = (charging_state: LocationStateInput): ParsedOcpiLocationData => {
+    const payload = build_mock_location_payload(charging_state);
     return cache_location_payload(payload);
 };
 
@@ -241,15 +220,15 @@ export const mock_send_command = (payload: any): SendCommandResponse => {
     };
 
     if (command === "START_SESSION") {
-        // Store minimal metadata for progress calculation
         set_session_progress_metadata(session_id, {
             started_at: new Date(),
+            target_kwh: simulator_config.target_kwh,
+            duration_seconds: simulator_config.duration_seconds,
         });
         return base_response;
     }
 
     if (command === "STOP_SESSION") {
-        // Real code handles session completion, we just return success
         return base_response;
     }
 
@@ -290,25 +269,18 @@ export const mock_get_command_status = (payload: any): GetCommandStatusResponse 
 
     const metadata = get_session_progress_metadata(session_id);
     if (!metadata) {
-        set_session_progress_metadata(session_id, {
-            started_at: session.started?.toDate() || new Date(),
-            target_kwh: simulator_config.default_target_kwh,
-            duration_seconds: simulator_config.default_session_duration_seconds,
-        });
+        throw new Error(`Session progress metadata not found for session_id: ${session_id}`);
     }
-    const final_metadata = get_session_progress_metadata(session_id)!;
 
     const now = new Date();
-    const elapsed_seconds = Math.floor((now.getTime() - final_metadata.started_at.getTime()) / 1000);
-    const is_completed = elapsed_seconds >= final_metadata.duration_seconds || session.status === "completed" || session.status === "paid";
-    const charging_time = is_completed ? final_metadata.duration_seconds : elapsed_seconds;
+    const elapsed_seconds = Math.floor((now.getTime() - metadata.started_at.getTime()) / 1000);
+    const is_completed = elapsed_seconds >= metadata.duration_seconds || session.status === "completed" || session.status === "paid";
+    const charging_time = is_completed ? metadata.duration_seconds : elapsed_seconds;
     const kwh = is_completed
-        ? final_metadata.target_kwh
-        : Math.min(final_metadata.target_kwh * (elapsed_seconds / final_metadata.duration_seconds), final_metadata.target_kwh);
+        ? metadata.target_kwh
+        : Math.min(metadata.target_kwh * (elapsed_seconds / metadata.duration_seconds), metadata.target_kwh);
     const cost = 5 + kwh * 1.4;
 
-    // Create CDR for completed sessions
-    // Pass a session object with status updated to ensure CDR is created
     const session_for_cdr: ChargingSession = {
         ...session,
         status: is_completed ? (session.status === "paid" ? "paid" : "completed") : session.status,

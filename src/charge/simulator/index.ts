@@ -1,68 +1,76 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { logger, cache_manager } from "akeyless-server-commons/managers";
 import { set_document, sleep, init_env_variables } from "akeyless-server-commons/helpers";
-import { disable_api_interceptor, enable_api_interceptor } from "./api_interceptor";
-import { set_session_progress_metadata, create_mock_location } from "./mock_store";
+import { set_session_progress_metadata, create_mock_location, DEFAULT_COORDINATES } from "./mock_store";
 import { ChargingState } from "../sessions/types";
 import { stop_session } from "../sessions";
 
 import dotenv from "dotenv";
-import { SessionSimulationConfig, SimulatorConfig } from "./types";
+import { get_config } from "../cloudwise_api/helpers";
 dotenv.config();
 
-export * from "./types";
-
-const { simulator } = init_env_variables();
+export interface SimulatorConfig {
+    duration_seconds: number;
+    target_kwh: number;
+    car_number: string;
+}
 
 export const simulator_config: SimulatorConfig = {
-    enabled: simulator === "true",
-    default_session_duration_seconds: 200,
-    default_target_kwh: 12,
+    duration_seconds: 0,
+    target_kwh: 0,
+    car_number: "",
 };
 
-export const run_simulator = async (config: SessionSimulationConfig) => {
-    if (!simulator_config.enabled) {
-        logger.error("Simulator is not enabled");
-        return { session_id: "", completed: false };
-    }
-    enable_api_interceptor();
+export const run_simulator = async (config: SimulatorConfig) => {
+    simulator_config.duration_seconds = config.duration_seconds;
+    simulator_config.target_kwh = config.target_kwh;
+    simulator_config.car_number = config.car_number;
     try {
+        const { simulator_list } = get_config();
+        if (!simulator_list.includes(config.car_number)) {
+            throw new Error("Car number is not in simulator list");
+        }
         logger.log("🤖 Simulator is running ...");
 
-        await trigger_plugin_event(config);
+        await trigger_plugin_event();
 
-        const session_id = await handle_session(config);
+        const session_id = await handle_session();
 
-        await finish_session(session_id, config.duration_seconds || simulator_config.default_session_duration_seconds);
+        await finish_session(session_id);
 
         return { session_id, completed: true };
     } catch (error) {
-        logger.error(`🤖 Simulator failed to run`, error);
+        logger.error(`🔴🤖 Simulator failed to run`, error);
         return { session_id: "", completed: false };
-    } finally {
-        disable_api_interceptor();
     }
 };
 
-const trigger_plugin_event = async (config: SessionSimulationConfig) => {
-    const { car_number, lat = 32.0853, lng = 34.7818 } = config;
+export const test_simulator = async () => {
+    const result = await run_simulator({ car_number: "3026953", duration_seconds: 100, target_kwh: 12 });
+    console.log("result of simulate session", result);
+};
+
+const trigger_plugin_event = async () => {
+    const { car_number } = simulator_config;
     const charging_state: ChargingState = {
         id: car_number,
         status: "plugin",
         car_number,
-        lat,
-        lng,
+        lat: DEFAULT_COORDINATES.lat,
+        lng: DEFAULT_COORDINATES.lng,
         timestamp: Timestamp.now(),
     };
     await set_document("nx-charge-state", car_number, charging_state);
-    create_mock_location(config, charging_state);
+    create_mock_location(charging_state);
 };
 
-const wait_for_session_id = async (car_number: string, max_wait_ms: number = 30000): Promise<string | null> => {
+const wait_for_session_id = async (): Promise<string | null> => {
+    const { car_number } = simulator_config;
+
     const start_time = Date.now();
     const poll_interval_ms = 500;
 
-    while (Date.now() - start_time < max_wait_ms) {
+    while (Date.now() - start_time < 30000) {
         const charging_states: ChargingState[] = cache_manager.getArrayData("nx-charge-state");
         const state = charging_states.find((s) => s.car_number === car_number);
 
@@ -76,13 +84,9 @@ const wait_for_session_id = async (car_number: string, max_wait_ms: number = 300
     return null;
 };
 
-const handle_session = async (config: SessionSimulationConfig) => {
-    const {
-        car_number,
-        duration_seconds = simulator_config.default_session_duration_seconds,
-        target_kwh = simulator_config.default_target_kwh,
-    } = config;
-    const session_id = await wait_for_session_id(car_number);
+const handle_session = async () => {
+    const { duration_seconds, target_kwh } = simulator_config;
+    const session_id = await wait_for_session_id();
 
     if (!session_id) {
         throw new Error("Simulator failed to retrieve session_id");
@@ -96,11 +100,17 @@ const handle_session = async (config: SessionSimulationConfig) => {
     return session_id;
 };
 
-const finish_session = async (session_id: string, duration_seconds: number) => {
+const finish_session = async (session_id: string) => {
+    const { duration_seconds } = simulator_config;
+
     await sleep(duration_seconds * 1000);
 
     await stop_session(session_id, { message: "Simulator completion", status: "completed" });
     // wait for CDR
     await sleep(50 * 1000);
+    // reset simulator config
+    simulator_config.duration_seconds = 0;
+    simulator_config.target_kwh = 0;
+    simulator_config.car_number = "";
     logger.log("🤖 Simulator completed");
 };

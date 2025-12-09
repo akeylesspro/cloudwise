@@ -16,7 +16,7 @@ interface StopSessionPayload {
 
 export const stop_session = async (session_id: string, options: StopSessionPayload) => {
     const { status = "completed", message } = options;
-    logger.log(`⛔ Stopping session: "${session_id}" with message: "${message}" ...`);
+    logger.log(`ℹ️ Stopping session: "${session_id}" with message: "${message}" ...`);
     stop_active_session_monitoring(session_id);
     try {
         let final_status: StopSessionPayload["status"] | "paid" = status;
@@ -52,14 +52,18 @@ const validate_session = (session_id: string): SessionWithId => {
 
 export const stop_session_command = async (session: SessionWithId) => {
     try {
-        const config: SessionCommandConfig & Partial<ChargingSession> = {
-            ...session,
+        const { id: session_id, asset_id, ble_id, device_id, location_id, station_uid, connector_id, car_number } = session;
+        const config: SessionCommandConfig = {
+            session_id,
+            car_number,
+            asset_id,
+            ble_id,
+            device_id,
+            location_id,
+            station_uid,
+            connector_id,
             command: "STOP_SESSION",
-            session_id: session.id,
         };
-        delete config.status;
-        delete config.car_number;
-        delete config.id;
         const request = async () => await session_command(config);
         await retry(request, { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "stop_session" });
         logger.log(`⛔ Session "${session.id}" stopped`);
@@ -95,7 +99,7 @@ const get_session_cdr = (session: SessionWithId) => {
                 Kwh: kwh = 0,
                 ChargingTimeInSeconds: charging_time_in_seconds,
                 Cdr: cdr,
-            } = await get_session_status({ asset_id, ble_id, session_id: session.id, device_id });
+            } = await get_session_status({ asset_id, ble_id, session_id: session.id, device_id, car_number: session.car_number });
             if (session_status.includes("COMPLETED")) {
                 const update: any = { cost, count, kwh, charging_time_in_seconds, updated: Timestamp.now() };
                 if (cdr) {
@@ -138,28 +142,19 @@ const charge_session = async (session: SessionWithId): Promise<boolean> => {
 
 export const charge_cdr = async (session: SessionWithId, cdr: ParsedCdrItem): Promise<boolean> => {
     const { car_number, cost: session_cost = 0, status: session_status } = session;
-    const { total_cost: cdr_cost = 0 } = cdr;
+    const { total_cost: cdr_cost } = cdr;
 
-    let cost = 0;
-    if (session_status === "paid") {
-        cost = cdr_cost - session_cost;
-    } else {
-        cost = cdr_cost;
-    }
-    if (cost === 0) {
-        return true;
-    }
+    const cost = session_status === "paid" ? cdr_cost - session_cost : cdr_cost;
     try {
         await charge_credit(car_number, cost);
-        if (session_status !== "paid") {
-            await set_document("nx-charge-sessions", session.id, {
-                ...session,
-                status: "paid",
-                updated: Timestamp.now(),
-                ended: Timestamp.now(),
-                message: "session_charged",
-            });
-        }
+        await set_document("nx-charge-sessions", session.id, {
+            ...session,
+            status: "paid",
+            updated: Timestamp.now(),
+            ended: Timestamp.now(),
+            message: "session_charged",
+        });
+
         return true;
     } catch (error) {
         logger.error(`🔴 Error in charge_cdr: ${session.id}`, JSON.stringify(error));
@@ -168,6 +163,9 @@ export const charge_cdr = async (session: SessionWithId, cdr: ParsedCdrItem): Pr
 };
 
 const charge_credit = async (car_number: string, cost: number) => {
+    if (cost === 0) {
+        return;
+    }
     let charge = cost;
     try {
         const { filtered_credits: credits } = await get_car_charge_credit_balance(car_number);

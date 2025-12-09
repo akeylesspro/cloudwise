@@ -4,7 +4,7 @@ import { retry } from "../helpers/retry";
 import { send_sms, set_document } from "akeyless-server-commons/helpers";
 import { stop_session } from "./stop_session";
 import type { ParsedSession } from "./types";
-import { check_car_charge_credit_balance, parse_session } from "../helpers";
+import { is_has_charge_balance, parse_session } from "../helpers";
 
 const active_timers = new Map<string, NodeJS.Timeout>();
 
@@ -17,22 +17,17 @@ export const stop_active_session_monitoring = (session_id: string): void => {
 };
 
 export const handle_active_session = async (session_id: string, car_number: string) => {
-    const existing_timer = active_timers.get(session_id);
-    if (existing_timer) {
-        clearTimeout(existing_timer);
-    }
-
-    let timer: NodeJS.Timeout | undefined;
     const clear_timer = () => {
-        if (timer) {
-            clearTimeout(timer);
+        const existing_timer = active_timers.get(session_id);
+        if (existing_timer) {
+            clearTimeout(existing_timer);
         }
         active_timers.delete(session_id);
     };
     const run = async () => {
         try {
             /// step 1: get session status
-            const session = await get_session_details(session_id);
+            const session = await get_session_details(session_id, car_number);
             const { session_status, cost } = session;
             await update_session(session_id, session);
             if (!session_status.includes("ACTIVE")) {
@@ -40,15 +35,13 @@ export const handle_active_session = async (session_id: string, car_number: stri
                 return await on_session_completed(session_id, car_number, `Session status is: ${session_status}`);
             }
             /// step 2: check credit balance
-            const { is_has_balance, balance } = await check_credit_balance(session_id, car_number, cost);
+            const { is_has_balance, balance } = await check_credit_balance(car_number, cost);
             if (!is_has_balance) {
                 clear_timer();
                 return await on_session_completed(session_id, car_number, `Car "${car_number}" does not have enough balance, balance: ${balance}`);
             }
             /// step 3: continue the timer
-            const new_timer = setTimeout(run, 30 * 1000);
-            active_timers.set(session_id, new_timer);
-            timer = new_timer;
+            active_timers.set(session_id, setTimeout(run, 30 * 1000));
         } catch (error) {
             clear_timer();
             await on_session_error(error, car_number, session_id);
@@ -57,10 +50,10 @@ export const handle_active_session = async (session_id: string, car_number: stri
     await run();
 };
 
-const get_session_details = async (session_id: string): Promise<ParsedSession> => {
+const get_session_details = async (session_id: string, car_number: string): Promise<ParsedSession> => {
     const { asset_id, ble_id, device_id } = get_config();
     try {
-        const request = async () => await get_session_status({ asset_id, ble_id, session_id, device_id });
+        const request = async () => await get_session_status({ asset_id, ble_id, session_id, device_id, car_number });
         const session = await retry(request, {
             retries: 4,
             random_delay: { min: 10, max: 20 },
@@ -103,8 +96,8 @@ const on_session_error = async (error: any, car_number: string, session_id: stri
     }
 };
 
-const check_credit_balance = async (session_id: string, car_number: string, cost: number) => {
-    const { is_has_balance, balance } = await check_car_charge_credit_balance(car_number, cost);
+const check_credit_balance = async (car_number: string, cost: number) => {
+    const { is_has_balance, balance } = await is_has_charge_balance(car_number, cost);
     if (!is_has_balance) {
         logger.log(`🟡 Car "${car_number}" does not have enough balance, balance: ${balance}`);
     }

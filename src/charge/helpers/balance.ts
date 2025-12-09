@@ -27,9 +27,8 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
         const {
             data: { data },
         } = response;
-        if (data.total === 0) {
-            logger.error(`🔴 Car "${car_number}" get 0 credits balance`);
-        }
+        const { total } = data;
+        logger.log(`⚡ Car "${car_number}" has ${total} credits balance`);
         return data;
     } catch (error) {
         logger.error("🔴 Error in get_car_charge_credit_balance", error);
@@ -37,7 +36,7 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
     }
 };
 
-export const check_car_charge_credit_balance = async (car_number: string, cost = 0): Promise<{ is_has_balance: boolean; balance: number }> => {
+export const is_has_charge_balance = async (car_number: string, cost = 0): Promise<{ is_has_balance: boolean; balance: number }> => {
     const { credit_balance_threshold } = get_config();
     const { total: balance } = await get_car_charge_credit_balance(car_number);
     const required = credit_balance_threshold + cost;

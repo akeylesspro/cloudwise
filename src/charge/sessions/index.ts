@@ -6,8 +6,6 @@ import type { ChargingState } from "./types";
 import { cache_manager } from "akeyless-server-commons/managers";
 import { logger } from "akeyless-server-commons/managers";
 import { Car } from "akeyless-types-commons";
-import { get_config } from "../cloudwise_api/helpers";
-import { simulator_config } from "../simulator";
 
 export * from "./start_session";
 export * from "./stop_session";
@@ -19,7 +17,7 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
     charging_states.forEach(async (new_state) => {
         const prev_state = prev.find((old) => old.car_number === new_state.car_number);
         if (!prev_state) {
-            if (check_permissions(new_state.car_number)) {
+            if (check_feature(new_state.car_number)) {
                 logger.log(`🟢 new state: "${new_state.car_number}" entered with status: "${new_state.status}"`);
                 handle_status_change(new_state);
             }
@@ -35,7 +33,7 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
                     await stop_session(new_state.session_id, { message: "Invalid state transition detected", status: "error" });
                 }
             }
-            if (check_permissions(new_state.car_number)) {
+            if (check_feature(new_state.car_number)) {
                 logger.log(`ℹ️  state: "${new_state.car_number}" got status changed from "${old_status}" to "${new_status}"`);
                 handle_status_change(new_state);
             }
@@ -54,12 +52,12 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
                 if (car_number === "16457003") {
                     send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");
                 }
-                if (check_permissions(car_number)) {
+                if (check_feature(car_number)) {
                     start_session(charging_state);
                 }
                 break;
             case "charging":
-                if (check_permissions(car_number) && charging_state.session_id) {
+                if (check_feature(car_number) && charging_state.session_id) {
                     logger.log(`🔄 Resuming monitoring for session ${charging_state.session_id}`);
                     handle_active_session(charging_state.session_id, charging_state.car_number);
                 }
@@ -100,18 +98,4 @@ const check_feature = (car_number: string): boolean => {
     }
     const car_features = car.features || [];
     return car_features.includes("plug_and_charge");
-};
-
-const simulator_check = (car_number: string): boolean => {
-    if (simulator_config.enabled) {
-        return true;
-    }
-    const { black_list } = get_config();
-    return !black_list.includes(car_number);
-};
-
-const check_permissions = (car_number: string): boolean => {
-    const simulator =  simulator_check(car_number)
-    const feature = check_feature(car_number)
-    return feature && simulator;
 };

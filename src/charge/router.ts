@@ -25,8 +25,8 @@ router.post(
     mandatory({
         body: [
             { key: "car_number", type: "string", length: 3 },
-            { key: "lat", type: "number" },
-            { key: "lng", type: "number" },
+            { key: "duration_seconds", type: "number" },
+            { key: "target_kwh", type: "number" },
         ],
     }),
     simulate_session_service
