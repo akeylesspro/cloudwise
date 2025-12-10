@@ -36,7 +36,7 @@ export interface ClosestUpdatedLocationResult {
 }
 
 export interface ChargingSession extends Omit<SessionCommandConfig, "command"> {
-    id?: string;
+    id: string;
     lat: number;
     lng: number;
     car_number: string;
@@ -50,7 +50,6 @@ export interface ChargingSession extends Omit<SessionCommandConfig, "command"> {
     kwh?: number;
 }
 
-export type SessionWithId = ChargingSession & { id: string };
 
 export interface ParsedSession {
     session_status: CommandStatus;

@@ -4,7 +4,7 @@ import type { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndS
 import { Timestamp } from "firebase-admin/firestore";
 import { get_config, get_location_details, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
-import { is_has_charge_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
+import { check_charge_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
 import { SessionCommandConfig } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
@@ -17,7 +17,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
     let session_id: string | undefined;
     try {
         /// step 1: check credit balance
-        await check_credit_balance(car_number);
+        await validate_credit(car_number);
         /// steps 2 & 3: get start session settings (closest location and connector)
         const command_config = await get_start_session_config(charging_state_object);
         /// step 4: send start session command
@@ -44,8 +44,8 @@ export const start_session = async (charging_state_object: ChargingState) => {
     }
 };
 
-const check_credit_balance = async (car_number: string) => {
-    const { is_has_balance } = await is_has_charge_balance(car_number);
+const validate_credit = async (car_number: string) => {
+    const { is_has_balance } = await check_charge_balance(car_number);
     if (!is_has_balance) {
         logger.error(`🔴 Car "${car_number}" does not have enough balance`);
         throw new Error("start_step_1__failed_to_check_car_charge_credit_balance");
@@ -235,7 +235,7 @@ const send_start_session_command = async (command_settings: SessionCommandConfig
 const update_collections = async (config: SessionCommandConfig, state_object: ChargingState, car_number: string, session_id: string) => {
     try {
         delete config.command;
-        const session: ChargingSession = {
+        const session: Omit<ChargingSession, "id"> = {
             ...config,
             car_number,
             lat: state_object.lat,

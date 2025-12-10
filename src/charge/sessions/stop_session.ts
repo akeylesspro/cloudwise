@@ -2,7 +2,7 @@ import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { Timestamp } from "firebase-admin/firestore";
 import { get_session_status, get_config, session_command } from "../cloudwise_api/helpers";
 import { get_car_charge_credit_balance, parse_cdr, subtract_credit_balance } from "../helpers";
-import type { ChargingSession, SessionWithId } from "./types";
+import type { ChargingSession } from "./types";
 import { SessionCommandConfig } from "../cloudwise_api/types";
 import { set_document } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
@@ -41,16 +41,16 @@ export const stop_session = async (session_id: string, options: StopSessionPaylo
     }
 };
 
-const validate_session = (session_id: string): SessionWithId => {
+const validate_session = (session_id: string): ChargingSession => {
     const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions");
     const session = sessions.find((session) => session.id === session_id);
     if (!session) {
         throw new Error("stop_step_1__session_not_found");
     }
-    return session as SessionWithId;
+    return session as ChargingSession;
 };
 
-export const stop_session_command = async (session: SessionWithId) => {
+export const stop_session_command = async (session: ChargingSession) => {
     try {
         const { id: session_id, asset_id, ble_id, device_id, location_id, station_uid, connector_id, car_number } = session;
         const config: SessionCommandConfig = {
@@ -73,7 +73,7 @@ export const stop_session_command = async (session: SessionWithId) => {
     }
 };
 
-const update_collections = async (session: SessionWithId, message: string, status: StopSessionPayload["status"] | "paid") => {
+const update_collections = async (session: ChargingSession, message: string, status: StopSessionPayload["status"] | "paid") => {
     try {
         await set_document("nx-charge-sessions", session.id, {
             status,
@@ -88,7 +88,7 @@ const update_collections = async (session: SessionWithId, message: string, statu
     }
 };
 
-const get_session_cdr = (session: SessionWithId) => {
+const get_session_cdr = (session: ChargingSession) => {
     setTimeout(async () => {
         try {
             const { asset_id, ble_id, device_id } = get_config();
@@ -125,7 +125,7 @@ const get_session_cdr = (session: SessionWithId) => {
     }, 20 * 1000);
 };
 
-const charge_session = async (session: SessionWithId): Promise<boolean> => {
+const charge_session = async (session: ChargingSession): Promise<boolean> => {
     const { car_number, cost = 0 } = session;
     if (cost === 0) {
         logger.log(`🔴 Session "${session.id}" cost is 0, skipping charge`);
@@ -140,7 +140,7 @@ const charge_session = async (session: SessionWithId): Promise<boolean> => {
     }
 };
 
-export const charge_cdr = async (session: SessionWithId, cdr: ParsedCdrItem): Promise<boolean> => {
+export const charge_cdr = async (session: ChargingSession, cdr: ParsedCdrItem): Promise<boolean> => {
     const { car_number, cost: session_cost = 0, status: session_status } = session;
     const { total_cost: cdr_cost } = cdr;
 

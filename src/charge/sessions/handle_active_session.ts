@@ -4,7 +4,7 @@ import { retry } from "../helpers/retry";
 import { send_sms, set_document } from "akeyless-server-commons/helpers";
 import { stop_session } from "./stop_session";
 import type { ParsedSession } from "./types";
-import { is_has_charge_balance, parse_session } from "../helpers";
+import { check_charge_balance, parse_session } from "../helpers";
 
 const active_timers = new Map<string, NodeJS.Timeout>();
 
@@ -35,8 +35,9 @@ export const handle_active_session = async (session_id: string, car_number: stri
                 return await on_session_completed(session_id, car_number, `Session status is: ${session_status}`);
             }
             /// step 2: check credit balance
-            const { is_has_balance, balance } = await check_credit_balance(car_number, cost);
+            const { is_has_balance, balance } = await check_charge_balance(car_number, cost);
             if (!is_has_balance) {
+                logger.log(`🟡 Car "${car_number}" does not have enough balance, balance: ${balance}`);
                 clear_timer();
                 return await on_session_completed(session_id, car_number, `Car "${car_number}" does not have enough balance, balance: ${balance}`);
             }
@@ -94,12 +95,4 @@ const on_session_error = async (error: any, car_number: string, session_id: stri
     } catch (error) {
         logger.error("🔴 Error in on_session_error", error);
     }
-};
-
-const check_credit_balance = async (car_number: string, cost: number) => {
-    const { is_has_balance, balance } = await is_has_charge_balance(car_number, cost);
-    if (!is_has_balance) {
-        logger.log(`🟡 Car "${car_number}" does not have enough balance, balance: ${balance}`);
-    }
-    return { is_has_balance, balance };
 };

@@ -4,7 +4,7 @@ import { ParsedOcpiLocationData } from "./types";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { isEqual } from "lodash";
 import { get_config, get_locations, get_user_cdrs, login } from "./cloudwise_api/helpers";
-import { ChargingSession, SessionWithId } from "./sessions/types";
+import { ChargingSession } from "./sessions/types";
 import { charge_cdr } from "./sessions";
 
 export const run_tasks = async () => {
@@ -79,8 +79,8 @@ export const task__collect_charge_cdrs = async () => {
                     if (current_cdr?.paid) {
                         return;
                     }
-                    const is_charged = await charge_cdr(session as SessionWithId, cdr);
-                    delete session.id;
+                    const is_charged = await charge_cdr(session as ChargingSession, cdr);
+                    delete (session as any).id;
                     delete cdr.id;
                     batch.set(db.collection("nx-charge-sessions").doc(session_id!), { cdr_id: cdr_id }, { merge: true });
                     batch.set(db.collection("nx-charge-cdrs").doc(cdr_id), {

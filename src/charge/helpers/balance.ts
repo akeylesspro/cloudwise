@@ -36,7 +36,7 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
     }
 };
 
-export const is_has_charge_balance = async (car_number: string, cost = 0): Promise<{ is_has_balance: boolean; balance: number }> => {
+export const check_charge_balance = async (car_number: string, cost = 0): Promise<{ is_has_balance: boolean; balance: number }> => {
     const { credit_balance_threshold } = get_config();
     const { total: balance } = await get_car_charge_credit_balance(car_number);
     const required = credit_balance_threshold + cost;
