@@ -19,6 +19,6 @@ const init = async () => {
 };
 
 init().catch((e) => {
-    logger.error(e);
+    logger.error("error in init function", e);
     process.exit(1);
 });

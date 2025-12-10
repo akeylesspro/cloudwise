@@ -1,29 +1,27 @@
-import { SessionCommandSettings } from "../cloudwise_api/types";
-import { EvseStatus, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
+import { SessionCommandConfig } from "../cloudwise_api/types";
+import { EvseStatus, ParsedCdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
 import type { Timestamp } from "firebase-admin/firestore";
 
-type ChargingStatus = "plugin" | "charging" | "plugout" | "error";
+type ChargingStateStatus = "plugin" | "charging" | "plugout" | "error" | "completed";
+
+export type SessionStatus = "started" | "completed" | "error" | "paid";
 
 export type CommandStatus = "ACTIVE" | "COMPLETED" | "FAILED";
 
 export interface ChargingState {
     id: string;
-    status: ChargingStatus;
+    status: ChargingStateStatus;
     car_number: string;
     lat: number;
     lng: number;
     timestamp: Timestamp;
     session_id?: string;
-}
-
-export interface GetDistanceMetersOptions {
-    lat1: number;
-    lng1: number;
-    lat2: number;
-    lng2: number;
+    message?: string;
+    is_charging?: boolean;
 }
 
 export interface GetLocationsByGeoAndStatusOptions {
+    car_number: string;
     lat: number;
     lng: number;
     radius_in_meters: number;
@@ -37,12 +35,26 @@ export interface ClosestUpdatedLocationResult {
     connector: ParsedConnectorData;
 }
 
-export interface ChargingSession extends Omit<SessionCommandSettings, "command"> {
-    id?: string;
+export interface ChargingSession extends Omit<SessionCommandConfig, "command"> {
+    id: string;
+    lat: number;
+    lng: number;
     car_number: string;
     updated: Timestamp;
     started: Timestamp;
     ended?: Timestamp;
-    status: "started" | "completed" | "error";
+    status: SessionStatus;
+    message?: string;
     cdr_id?: string;
+    cost?: number;
+    kwh?: number;
+}
+
+
+export interface ParsedSession {
+    session_status: CommandStatus;
+    cost: number;
+    charging_time_in_seconds: number;
+    kwh: number;
+    session_id: string;
 }
