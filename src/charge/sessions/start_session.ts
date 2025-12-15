@@ -36,7 +36,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
         } else {
             await set_document("nx-charge-state", car_number, {
                 ...charging_state_object,
-                status: "error",
+                ocpi_status: "error",
                 timestamp: Timestamp.now(),
                 message: error.message || "unknown error",
             });
@@ -247,7 +247,7 @@ const update_collections = async (config: SessionCommandConfig, state_object: Ch
         await set_document("nx-charge-sessions", session_id, session);
         await set_document("nx-charge-state", car_number, {
             ...state_object,
-            status: "charging",
+            ocpi_status: "charging",
             session_id,
             timestamp: Timestamp.now(),
         });

@@ -54,11 +54,13 @@ const trigger_plugin_event = async () => {
     const { car_number } = simulator_config;
     const charging_state: ChargingState = {
         id: car_number,
-        status: "plugin",
+        ocpi_status: "plugin",
+        canbus_status: "plugin",
         car_number,
         lat: DEFAULT_COORDINATES.lat,
         lng: DEFAULT_COORDINATES.lng,
         timestamp: Timestamp.now(),
+
     };
     await set_document("nx-charge-state", car_number, charging_state);
     create_mock_location(charging_state);

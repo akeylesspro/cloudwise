@@ -13,13 +13,13 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
         const prev_state = prev.find((old) => old.car_number === new_state.car_number);
         if (!prev_state) {
             if (check_feature(new_state.car_number)) {
-                logger.log(`🟢 new state: "${new_state.car_number}" entered with status: "${new_state.status}"`);
+                logger.log(`🟢 new state: "${new_state.car_number}" entered with status: "${new_state.ocpi_status}"`);
                 handle_status_change(new_state);
             }
             prev = [...prev, new_state];
             return;
         }
-        const [old_status, new_status] = [prev_state.status, new_state.status];
+        const [old_status, new_status] = [prev_state.ocpi_status, new_state.ocpi_status];
         if (old_status !== new_status) {
             if (new_state.session_id && new_status === "plugin") {
                 logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
@@ -41,8 +41,8 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
 export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
     cache_manager.setArrayData("nx-charge-state", charging_states);
     for (const charging_state of charging_states) {
-        const { status, car_number } = charging_state;
-        switch (status) {
+        const { ocpi_status, car_number } = charging_state;
+        switch (ocpi_status) {
             case "plugin":
                 if (car_number === "16457003") {
                     send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");
@@ -64,8 +64,8 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
 };
 
 const handle_status_change = async (charging_state_object: ChargingState) => {
-    const { status, car_number } = charging_state_object;
-    switch (status) {
+    const { ocpi_status, car_number } = charging_state_object;
+    switch (ocpi_status) {
         case "plugin":
             if (car_number === "16457003") {
                 send_sms("0522614678", "היי נאור אילן עם רכב מספר 16457003 קיבל אירוע של plugin", "naor tests");

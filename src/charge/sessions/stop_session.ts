@@ -76,7 +76,7 @@ export const stop_session_command = async (session: ChargingSession) => {
 const update_collections = async (session: ChargingSession, message: string, status: StopSessionPayload["status"] | "paid") => {
     try {
         await set_document("nx-charge-sessions", session.id, {
-            status,
+            ocpi_status: status,
             updated: Timestamp.now(),
             ended: Timestamp.now(),
             message,
