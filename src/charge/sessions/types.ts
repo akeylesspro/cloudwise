@@ -2,7 +2,7 @@ import { SessionCommandConfig } from "../cloudwise_api/types";
 import { EvseStatus, ParsedCdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
 import type { Timestamp } from "firebase-admin/firestore";
 
-type ChargingStateOcpiStatus = "plugin" | "charging" | "plugout" | "error" | "completed";
+type ChargingStateOcpiStatus = "plugin" | "charging" | "plugout" | "error" | "completed" | "paid";
 type ChargingStateCanbusStatus = "plugin" | "plugout" | "charging_on" | "charging_off";
 
 export type SessionStatus = "started" | "completed" | "error" | "paid";
