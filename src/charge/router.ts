@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { get_cdrs, get_location_status, get_locations, stop_session_service, simulate_session_service } from "./services";
-import { mandatory, nx_user_login } from "akeyless-server-commons/middlewares";
+import { mandatory, nx_user_login, verify_user_auth } from "akeyless-server-commons/middlewares";
 import package_json from "../../package.json";
 
 const router: Router = Router();
@@ -17,7 +17,7 @@ router.get("/locations/status", get_location_status);
 
 router.post("/locations/get", get_locations);
 
-router.post("/sessions/stop", nx_user_login, mandatory({ body: [{ key: "car_number", type: "string", length: 3 }] }), stop_session_service);
+router.post("/sessions/stop", verify_user_auth, mandatory({ body: [{ key: "car_number", type: "string", length: 3 }] }), stop_session_service);
 
 router.post(
     "/sessions/simulate",
