@@ -103,7 +103,7 @@ const get_closest_locations = async (charging_state_object: ChargingState): Prom
 
         const request_config = {
             debug: true,
-            retries: 3,
+            retries: 5,
             throw_if_empty_result: true,
             random_delay: { min: 5, max: 10 },
             on_retry_fn: () => {
