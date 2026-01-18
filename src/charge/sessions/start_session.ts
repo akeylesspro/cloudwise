@@ -85,7 +85,18 @@ const get_locations_by_geo_and_status = async ({
         });
     }
     const result = ocpi_locations.filter((location) => location.stations.some((station) => statuses.includes(station.status)));
-    logger.log(`get_locations_by_geo_and_status: found ${result.length} locations with statuses: ${statuses.join(", ")}`);
+    if (result.length === 0 && ocpi_locations.length > 0) {
+        logger.error(
+            `get_locations_by_geo_and_status: no locations found with statuses: ${statuses.join(", ")}`,
+            ocpi_locations.map((location) => ({
+                location_name: location.name,
+                location_id: location.id,
+                stations_statuses: location.stations.map((station) => station.status),
+            }))
+        );
+    } else {
+        logger.log(`get_locations_by_geo_and_status: found ${result.length} locations with statuses: ${statuses.join(", ")}`);
+    }
     return result;
 };
 
