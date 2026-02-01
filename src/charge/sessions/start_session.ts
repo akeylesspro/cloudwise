@@ -13,7 +13,8 @@ import { stop_session } from "./stop_session";
 /// ------------------ start session (main function) ------------------
 export const start_session = async (charging_state_object: ChargingState) => {
     const { car_number, lat, lng } = charging_state_object;
-    logger.log(`Starting session for car: "${car_number}" ...`, { lat, lng });
+    const maps_url = `https://www.google.com/maps?q=${lat},${lng}`;
+    logger.log(`Starting session for car: "${car_number}" ...`, { maps_url });
     let session_id: string | undefined;
     try {
         /// step 1: check credit balance
@@ -125,7 +126,8 @@ const get_closest_locations = async (charging_state_object: ChargingState): Prom
         const closest_locations: ParsedOcpiLocationData[] = await retry(request, request_config);
         return closest_locations;
     } catch (error) {
-        logger.error(`🔴 Error in get_closest_locations ${JSON.stringify({ lat, lng })}`, error);
+        const maps_url = `https://www.google.com/maps?q=${lat},${lng}`;
+        logger.error(`🔴 Error in get_closest_locations ${JSON.stringify({ maps_url })}`, error);
         throw new Error("start_step_2__failed_to_get_closest_locations");
     }
 };

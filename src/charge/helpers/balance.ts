@@ -3,6 +3,7 @@ import { get_custom_fb_token } from "../helpers";
 import axios from "axios";
 import { logger } from "akeyless-server-commons/managers";
 import { get_config } from "../cloudwise_api/helpers";
+import { retry } from "./retry";
 import { CreditItem, TObject } from "akeyless-types-commons";
 
 interface CreditBalance {
@@ -15,13 +16,24 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
     try {
         const token = await get_custom_fb_token();
         const end_users_url = get_nx_service_urls().end_users;
-        const response = await axios.post(
-            `${end_users_url}/credits/balance`,
-            { car_number, types: ["charge_external"] },
+        const response = await retry(
+            () =>
+                axios.post(
+                    `${end_users_url}/credits/balance`,
+                    { car_number, types: ["charge_external"] },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    }
+                ),
             {
-                headers: {
-                    Authorization: `Bearer ${token}`,
+                retries: 3,
+                name: "get_car_charge_credit_balance",
+                on_retry_fn: (attempt, retries, last_error) => {
+                    logger.warn(`🟠 Retry ${attempt}/${retries} for get_car_charge_credit_balance failed`, last_error);
                 },
+                random_delay: { min: 20, max: 40 },
             }
         );
         const {
