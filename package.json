@@ -20,8 +20,8 @@
     "dependencies": {
         "@avto-dev/vehicle-logotypes": "^2.10.0",
         "@types/ping": "^0.4.4",
-        "akeyless-server-commons": "^1.0.152",
-        "akeyless-types-commons": "^1.0.78",
+        "akeyless-server-commons": "^1.0.168",
+        "akeyless-types-commons": "^1.0.87",
         "axios": "^1.6.8",
         "express": "^4.19.2",
         "firebase": "^12.6.0",
