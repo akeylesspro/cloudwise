@@ -81,7 +81,7 @@ const update_collections = async (session: ChargingSession, message: string, sta
             ended: Timestamp.now(),
             message,
         });
-        await set_document("nx-charge-state", session.car_number, { status, session_id: "", timestamp: Timestamp.now(), message });
+        await set_document("nx-charge-state", session.car_number, { ocpi_status:status, session_id: "", timestamp: Timestamp.now(), message });
     } catch (error) {
         logger.error(`🔴 Error in update_collections: ${session.id}`, JSON.stringify(error));
         throw new Error("stop_step_4__failed_to_update_collections");
