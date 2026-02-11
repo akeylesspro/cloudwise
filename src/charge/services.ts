@@ -1,13 +1,14 @@
 import { Service } from "akeyless-server-commons/types";
-import { get_location_details } from "./cloudwise_api/helpers";
+import { get_config, get_location_details } from "./cloudwise_api/helpers";
 import { init_env_variables, json_failed, json_ok } from "akeyless-server-commons/helpers";
 import { get_cdrs as get_cdrs_helper, get_distance_meters, parse_eves, parse_location } from "./helpers";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
 import { ParsedOcpiLocationData } from "./types";
-import { stop_session } from "./sessions";
+import { start_session_api, stop_session } from "./sessions";
 import { TObject } from "akeyless-types-commons";
 import { run_simulator } from "./simulator";
 import { ChargingSession } from "./sessions/types";
+import { SessionCommandConfig } from "./cloudwise_api/types";
 
 export const get_location_status: Service = async (req, res) => {
     const { original_id, party_id } = req.query as TObject<string>;
@@ -48,6 +49,36 @@ export const stop_session_service: Service = async (req, res) => {
     }
 };
 
+interface StartSessionApiOptions {
+    car_number: string;
+    location_id: string;
+    station_uid: string;
+    connector_id: string;
+}
+export const start_session_service: Service = async (req, res) => {
+    const { car_number, location_id, station_uid, connector_id } = req.body as StartSessionApiOptions;
+    try {
+        const { asset_id, ble_id, device_id } = get_config();
+        const config: SessionCommandConfig = {
+            asset_id,
+            ble_id,
+            device_id,
+            car_number,
+            location_id,
+            station_uid,
+            connector_id,
+        };
+        const session_id = await start_session_api(config);
+        if (!session_id) {
+            throw new Error("Failed to start session");
+        }
+        res.send(json_ok({ session_id }));
+    } catch (error) {
+        logger.error(`Error in start_session_service, car number: ${car_number}`, error);
+        res.send(json_failed({ error, config: req.body }));
+    }
+};
+
 export const get_cdrs: Service = async (req, res) => {
     const { car_number, limit, offset } = req.body;
     try {
@@ -58,6 +89,7 @@ export const get_cdrs: Service = async (req, res) => {
         logger.error(`Error in get_cdrs, car number: ${car_number}`, error);
     }
 };
+
 interface GetLocationsOptions {
     limit?: number;
     id?: string;

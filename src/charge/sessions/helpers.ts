@@ -28,10 +28,8 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
                     await stop_session(new_state.session_id, { message: "Invalid state transition detected", status: "error" });
                 }
             }
-            if (check_feature(new_state.car_number)) {
-                logger.log(`ℹ️  state: "${new_state.car_number}" got status changed from "${old_status}" to "${new_status}"`);
-                handle_status_change(new_state);
-            }
+            logger.log(`ℹ️  state: "${new_state.car_number}" got status changed from "${old_status}" to "${new_status}"`);
+            handle_status_change(new_state);
         }
         prev = prev.map((old) => (old.car_number === new_state.car_number ? new_state : old));
     });
@@ -52,7 +50,7 @@ export const on_snapshot_first_time = (charging_states: ChargingState[]) => {
                 }
                 break;
             case "charging":
-                if (check_feature(car_number) && charging_state.session_id) {
+                if (charging_state.session_id) {
                     logger.log(`🔄 Resuming monitoring for session ${charging_state.session_id}`);
                     handle_active_session(charging_state.session_id, charging_state.car_number);
                 }

@@ -61,14 +61,14 @@ export type SessionCommand = "START_SESSION" | "STOP_SESSION";
 /// send command
 export interface SessionCommandConfig {
     car_number: string;
-    command?: SessionCommand;
     location_id: string;
-    party_id?: string;
     station_uid: string;
     connector_id: string;
-    ble_id: string;
     device_id: string;
     asset_id: string;
+    ble_id: string;
+    party_id?: string;
+    command?: SessionCommand;
     ignore_distance_check?: boolean;
     session_id?: string;
     lat?: number;

@@ -9,6 +9,7 @@ import { SessionCommandConfig } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
 import { stop_session } from "./stop_session";
+import { Geo } from "akeyless-types-commons";
 
 /// ------------------ start session (main function) ------------------
 export const start_session = async (charging_state_object: ChargingState) => {
@@ -24,14 +25,15 @@ export const start_session = async (charging_state_object: ChargingState) => {
         /// step 4: send start session command
         session_id = await send_start_session_command(command_config);
         /// step 5: update collections
-        await update_collections(command_config, charging_state_object, car_number, session_id);
+        const { lat, lng } = charging_state_object;
+        await update_collections(command_config, { lat, lng }, car_number, session_id);
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         if (car_number === "16457003") {
             send_sms("0522614678", `היי נאור אילן עם רכב מספר ${car_number} התחיל טעינה בהצלחה`, "naor tests");
         }
         return session_id;
     } catch (error: any) {
-        logger.error("🔴 Error in start_session", error);
+        logger.error(`🔴 Error in start_session for car: "${car_number}" session : "${session_id || "N/A"}"`, error);
         if (session_id) {
             await stop_session(session_id, { message: error.message || "unknown error", status: "error" });
         } else {
@@ -43,6 +45,61 @@ export const start_session = async (charging_state_object: ChargingState) => {
             });
         }
     }
+};
+
+export const start_session_api = async (config: SessionCommandConfig): Promise<string | undefined> => {
+    let session_id: string | undefined;
+    const { car_number } = config;
+    try {
+        /// step 1: check credit balance
+        await validate_credit(car_number);
+        /// step 2: validate location
+        const { location } = await validate_location(config);
+        /// step 3: send start session command
+        session_id = await send_start_session_command(config);
+        /// step 4: update collections
+        const { lat, lng } = location;
+        await update_collections(config, { lat, lng }, car_number, session_id);
+        return session_id;
+    } catch (error: any) {
+        logger.error(`🔴 Error in start_session_api for car: "${car_number}" session : "${session_id || "N/A"}"`, config);
+        logger.error(`🔴 Error`, error);
+        if (session_id) {
+            await stop_session(session_id, { message: error.message || "unknown error", status: "error" });
+        } else {
+            await set_document("nx-charge-state", config.car_number, {
+                ocpi_status: "error",
+                timestamp: Timestamp.now(),
+                message: error.message || "unknown error",
+            });
+        }
+        return undefined;
+    }
+};
+
+const validate_location = async (config: SessionCommandConfig) => {
+    const { car_number } = config;
+    const locations: ParsedOcpiLocationData[] = cache_manager.getArrayData(`nx-charge-locations`);
+    const location = locations.find((location) => location.id === config.location_id);
+    if (!location) {
+        throw new Error(`start_step_2 : Location "${config.location_id}" not found`);
+    }
+    const request = async () => await get_location_details(location.original_id, { party_id: location.party_id, car_number });
+    const request_config = { retries: 3, random_delay: { min: 10, max: 20 }, name: "validate_location" };
+    const location_details = await retry(request, request_config);
+    const stations = location_details.Evses.map(parse_eves);
+    const station = stations.find((station) => station.uid === config.station_uid);
+    if (!station) {
+        throw new Error(`start_step_2 : Station "${config.station_uid}" not found in location "${config.location_id}"`);
+    }
+    if (station.status !== "BLOCKED" && station.status !== "PREPARING") {
+        throw new Error(`start_step_2 : Station "${config.station_uid}" is not in status "BLOCKED" or "PREPARING"`);
+    }
+    const connector = station.connectors.find((connector) => connector.id === config.connector_id);
+    if (!connector) {
+        throw new Error(`start_step_2 : Connector "${config.connector_id}" not found in station "${config.station_uid}"`);
+    }
+    return { location, station, connector };
 };
 
 const validate_credit = async (car_number: string) => {
@@ -245,21 +302,20 @@ const send_start_session_command = async (command_settings: SessionCommandConfig
 };
 
 // ------------------ update collections ------------------
-const update_collections = async (config: SessionCommandConfig, state_object: ChargingState, car_number: string, session_id: string) => {
+const update_collections = async (config: SessionCommandConfig, geo: Geo, car_number: string, session_id: string) => {
     try {
         delete config.command;
         const session: Omit<ChargingSession, "id"> = {
             ...config,
             car_number,
-            lat: state_object.lat,
-            lng: state_object.lng,
+            lat: geo.lat,
+            lng: geo.lng,
             status: "started",
             started: Timestamp.now(),
             updated: Timestamp.now(),
         };
         await set_document("nx-charge-sessions", session_id, session);
         await set_document("nx-charge-state", car_number, {
-            ...state_object,
             ocpi_status: "charging",
             session_id,
             timestamp: Timestamp.now(),
