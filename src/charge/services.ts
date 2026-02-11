@@ -54,11 +54,9 @@ interface StartSessionApiOptions {
     location_id: string;
     station_uid: string;
     connector_id: string;
-    lat: number;
-    lng: number;
 }
 export const start_session_service: Service = async (req, res) => {
-    const { car_number, location_id, station_uid, connector_id, lat, lng } = req.body as StartSessionApiOptions;
+    const { car_number, location_id, station_uid, connector_id } = req.body as StartSessionApiOptions;
     try {
         const { asset_id, ble_id, device_id } = get_config();
         const config: SessionCommandConfig = {
@@ -69,8 +67,6 @@ export const start_session_service: Service = async (req, res) => {
             location_id,
             station_uid,
             connector_id,
-            lat,
-            lng,
         };
         const session_id = await start_session_api(config);
         if (!session_id) {

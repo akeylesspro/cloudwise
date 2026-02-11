@@ -54,12 +54,12 @@ export const start_session_api = async (config: SessionCommandConfig): Promise<s
         /// step 1: check credit balance
         await validate_credit(car_number);
         /// step 2: validate location
-        await validate_location(config);
+        const { location } = await validate_location(config);
         /// step 3: send start session command
         session_id = await send_start_session_command(config);
         /// step 4: update collections
-        const { lat, lng } = config;
-        await update_collections(config, { lat: lat!, lng: lng! }, car_number, session_id);
+        const { lat, lng } = location;
+        await update_collections(config, { lat, lng }, car_number, session_id);
         return session_id;
     } catch (error: any) {
         logger.error(`🔴 Error in start_session_api for car: "${car_number}" session : "${session_id || "N/A"}"`, config);
@@ -99,6 +99,7 @@ const validate_location = async (config: SessionCommandConfig) => {
     if (!connector) {
         throw new Error(`start_step_2 : Connector "${config.connector_id}" not found in station "${config.station_uid}"`);
     }
+    return { location, station, connector };
 };
 
 const validate_credit = async (car_number: string) => {

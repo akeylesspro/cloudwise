@@ -28,8 +28,6 @@ router.post(
             { key: "location_id", type: "string" },
             { key: "station_uid", type: "string" },
             { key: "connector_id", type: "string" },
-            { key: "lat", type: "number" },
-            { key: "lng", type: "number" },
         ],
     }),
     start_session_service
