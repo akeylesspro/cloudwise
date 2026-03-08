@@ -21,7 +21,7 @@ export const handle_charging_state_snapshot = (charging_states: ChargingState[])
         }
         const [old_status, new_status] = [prev_state.ocpi_status, new_state.ocpi_status];
         if (old_status !== new_status) {
-            if (new_state.session_id && new_status === "plugin") {
+            if ((new_state.session_id || old_status === "charging") && new_status === "plugin") {
                 logger.warn(`🚫⏩ get status change from charging to plugin, skipping ...`);
                 // Check if there's an active session that should be stopped
                 if (new_state.session_id) {
