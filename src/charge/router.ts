@@ -1,5 +1,13 @@
 import { Router } from "express";
-import { get_cdrs, get_location_status, get_locations, stop_session_service, simulate_session_service, start_session_service } from "./services";
+import {
+    service__get_cdrs,
+    service__get_location_status,
+    service__get_locations,
+    service__stop_session,
+    service__simulate_session,
+    service__start_session,
+    service__fetch_all_locations,
+} from "./services";
 import { mandatory, nx_user_login, verify_user_auth } from "akeyless-server-commons/middlewares";
 import package_json from "../../package.json";
 
@@ -13,11 +21,13 @@ router.get("/v", (req, res) => {
     res.send(`${package_json.version} --${process.env.mode === "qa" ? "QA" : "PROD"}`);
 });
 
-router.get("/locations/status", get_location_status);
+router.get("/locations/status", service__get_location_status);
 
-router.post("/locations/get", get_locations);
+router.get("/locations/fetch", verify_user_auth, service__fetch_all_locations);
 
-router.post("/sessions/stop", verify_user_auth, mandatory({ body: [{ key: "car_number", type: "string", length: 3 }] }), stop_session_service);
+router.post("/locations/get", service__get_locations);
+
+router.post("/sessions/stop", verify_user_auth, mandatory({ body: [{ key: "car_number", type: "string", length: 3 }] }), service__stop_session);
 
 router.post(
     "/sessions/start",
@@ -30,7 +40,7 @@ router.post(
             { key: "connector_id", type: "string" },
         ],
     }),
-    start_session_service
+    service__start_session
 );
 
 router.post(
@@ -43,9 +53,9 @@ router.post(
             { key: "target_kwh", type: "number" },
         ],
     }),
-    simulate_session_service
+    service__simulate_session
 );
 
-router.post("/cdrs", nx_user_login, mandatory({ body: [{ key: "car_number", type: "string", length: 3 }] }), get_cdrs);
+router.post("/cdrs", nx_user_login, mandatory({ body: [{ key: "car_number", type: "string", length: 3 }] }), service__get_cdrs);
 
 export default router;

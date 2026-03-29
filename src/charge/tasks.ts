@@ -1,4 +1,4 @@
-import { db, execute_task, TaskName } from "akeyless-server-commons/helpers";
+import { db, execute_task, init_env_variables, TaskName } from "akeyless-server-commons/helpers";
 import { parse_cdr, parse_ocpi_location } from "./helpers";
 import { ParsedOcpiLocationData } from "./types";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
@@ -8,20 +8,23 @@ import { ChargingSession } from "./sessions/types";
 import { charge_cdr } from "./sessions";
 
 export const run_tasks = async () => {
-    const hour = 60 * 60 * 1000;
+    const env_data = init_env_variables();
+    if (env_data.run_tasks == "true") {
+        const hour = 60 * 60 * 1000;
 
-    /// login
-    setInterval(login, 2 * hour);
-    /// collect locations
-    execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
-    setInterval(() => {
+        /// login
+        setInterval(login, 2 * hour);
+        /// collect locations
         execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
-    }, 12 * hour);
-    /// collect cdrs
-    execute_task("nx-charge", TaskName.collect_charge_cdrs, task__collect_charge_cdrs, { debug_logs: false });
-    setInterval(() => {
+        setInterval(() => {
+            execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
+        }, 12 * hour);
+        /// collect cdrs
         execute_task("nx-charge", TaskName.collect_charge_cdrs, task__collect_charge_cdrs, { debug_logs: false });
-    }, 5 * 60 * 1000);
+        setInterval(() => {
+            execute_task("nx-charge", TaskName.collect_charge_cdrs, task__collect_charge_cdrs, { debug_logs: false });
+        }, 5 * 60 * 1000);
+    }
 };
 
 export const task__collect_charge_locations = async () => {
