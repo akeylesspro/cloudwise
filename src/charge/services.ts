@@ -13,7 +13,7 @@ import { task__collect_charge_locations } from "./tasks";
 
 export const service__fetch_all_locations: Service = async (req, res) => {
     try {
-        execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
+        await task__collect_charge_locations();
         res.json(json_ok({ message: "All locations fetched" }));
     } catch (error) {
         logger.error(`Error in service__fetch_all_locations`, error);
