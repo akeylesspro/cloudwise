@@ -50,7 +50,7 @@ export interface Connector {
     Id: string;
     EvseUid: string;
     Standard: string;
-    Format: string;
+    Format: ConnectorCableSocket;
     PowerType: string;
     MaxVoltage: number;
     MaxAmperage: number;
@@ -64,10 +64,12 @@ export interface Connector {
     TariffDetails: TariffDetails;
 }
 
+export type ConnectorCableSocket = "CABLE" | "SOCKET";
+
 export interface ParsedConnectorData {
     id: string;
     standard: string;
-    format: string;
+    format: ConnectorCableSocket;
     power_type: string;
     max_voltage: number;
     max_amperage: number;
@@ -83,7 +85,8 @@ export interface ParsedConnectorData {
 export type OcpiConnector = Omit<Connector, "PricePerKwh" | "ConnectionFee" | "ParkingFee" | "TariffDetails">;
 
 /// ------------------------------ evse types ------------------------------
-export type EvseStatus = "AVAILABLE" | "CHARGING" | "BLOCKED" | "INOPERATIVE" | "PREPARING";
+export type EvseStatus = "AVAILABLE" | "PREPARING" | "BLOCKED" | "CHARGING" | "INOPERATIVE" | "OUTOFORDER" | "UNKNOWN" | "PLANNED";
+export type EvseConnectorStandard = "IEC_62196_T2" | "IEC_62196_T2_COMBO" | "CHADEMO" | "IEC_62196_T1_COMBO" | "DOMESTIC_A" | "DOMESTIC_C";
 
 export interface Evse {
     Uid: string;
@@ -103,8 +106,9 @@ export interface Evse {
     Description: string[];
 }
 
-export interface ParsedEvseData {
+export interface ParsedStationData {
     uid: string;
+    id: string;
     status: EvseStatus;
     floor_level: string | null;
     physical_reference: string | null;
@@ -163,7 +167,7 @@ export interface ParsedOcpiLocationData extends ParsedLocationData {
     original_id: string;
     company_name: string;
     party_id: string;
-    stations: ParsedEvseData[];
+    stations: ParsedStationData[];
 }
 
 // ------------------------------ CDR types ------------------------------

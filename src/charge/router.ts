@@ -7,6 +7,7 @@ import {
     service__simulate_session,
     service__start_session,
     service__fetch_all_locations,
+    service__get_location_details,
 } from "./services";
 import { mandatory, nx_user_login, verify_user_auth } from "akeyless-server-commons/middlewares";
 import package_json from "../../package.json";
@@ -22,6 +23,8 @@ router.get("/v", (req, res) => {
 });
 
 router.get("/locations/status", service__get_location_status);
+
+router.get("/locations/:id", service__get_location_details);
 
 router.get("/locations/fetch", verify_user_auth, service__fetch_all_locations);
 

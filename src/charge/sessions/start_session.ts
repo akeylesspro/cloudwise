@@ -4,7 +4,7 @@ import type { ChargingState, ClosestUpdatedLocationResult, GetLocationsByGeoAndS
 import { Timestamp } from "firebase-admin/firestore";
 import { get_config, get_location_details, session_command } from "../cloudwise_api/helpers";
 import moment from "moment";
-import { check_charge_balance, get_distance_meters, parse_eves, parse_location } from "../helpers";
+import { check_charge_balance, get_distance_meters, parse_stations, parse_location } from "../helpers";
 import { SessionCommandConfig } from "../cloudwise_api/types";
 import { send_sms, set_document, timestamp_to_string } from "akeyless-server-commons/helpers";
 import { retry } from "../helpers/retry";
@@ -87,7 +87,7 @@ const validate_location = async (config: SessionCommandConfig) => {
     const request = async () => await get_location_details(location.original_id, { party_id: location.party_id, car_number });
     const request_config = { retries: 3, random_delay: { min: 10, max: 20 }, name: "validate_location" };
     const location_details = await retry(request, request_config);
-    const stations = location_details.Evses.map(parse_eves);
+    const stations = location_details.Evses.map(parse_stations);
     const station = stations.find((station) => station.uid === config.station_uid);
     if (!station) {
         throw new Error(`start_step_2 : Station "${config.station_uid}" not found in location "${config.location_id}"`);
@@ -133,10 +133,10 @@ const get_locations_by_geo_and_status = async ({
     for (const location of locations_data) {
         const location_details = await get_location_details(location.original_id, { party_id: location.party_id, car_number });
         const parsed_location = parse_location(location_details.Location);
-        const parsed_evses = location_details.Evses.map(parse_eves);
+        const parsed_stations = location_details.Evses.map(parse_stations);
         ocpi_locations.push({
             ...parsed_location,
-            stations: parsed_evses,
+            stations: parsed_stations,
             company_name: location.company_name,
             party_id: location.party_id,
             original_id: location.original_id,

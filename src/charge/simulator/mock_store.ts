@@ -3,7 +3,7 @@ import { cache_manager } from "akeyless-server-commons/managers";
 import { GetCommandStatusResponse, GetLocationDetailsResponse, SendCommandResponse, UserCdrsResponse } from "../cloudwise_api/types";
 import { ChargingSession, ChargingState, CommandStatus } from "../sessions/types";
 import { CdrItem, Connector, Evse, Location, ParsedOcpiLocationData } from "../types";
-import { parse_eves, parse_location } from "../helpers/parsers";
+import { parse_stations, parse_location } from "../helpers/parsers";
 import { simulator_config } from "./";
 
 interface SessionProgressMetadata {
@@ -153,7 +153,7 @@ const to_parsed_location = (payload: LocationResponsePayload): ParsedOcpiLocatio
         original_id: parsed_location.id,
         company_name: DEFAULT_COMPANY_NAME,
         party_id,
-        stations: payload.Evses.map(parse_eves),
+        stations: payload.Evses.map(parse_stations),
     };
 };
 
