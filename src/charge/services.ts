@@ -62,22 +62,25 @@ export const service__get_location_details: Service = async (req, res) => {
         const stations = parsed_stations
             .filter((station) => relevant_statuses.includes(station.status))
             .map((station) => {
-                const { id, status, connectors } = station;
+                const { id, uid, status, connectors } = station;
                 return {
                     id,
+                    uid,
                     status,
                     connector: connectors[0],
                 };
             })
             .filter((station) => station.connector)
             .map((station) => {
-                const { id, status, connector } = station;
-                const { standard, format, power_type, max_electric_power: max_power, price_per_kwh: price_kwh } = connector;
+                const { id, uid, status, connector } = station;
+                const { id: connector_id, standard, format, power_type, max_electric_power: max_power, price_per_kwh: price_kwh } = connector;
                 const is_cable_included = format === "CABLE";
                 return {
                     id,
+                    uid,
                     status,
                     connector: {
+                        id: connector_id,
                         standard,
                         cable_included: is_cable_included,
                         power_type,
