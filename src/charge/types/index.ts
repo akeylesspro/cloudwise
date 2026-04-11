@@ -161,6 +161,7 @@ export interface ParsedLocationData {
     lat: number;
     lng: number;
     image?: string | null;
+    company_name: string;
 }
 
 export interface ParsedOcpiLocationData extends ParsedLocationData {

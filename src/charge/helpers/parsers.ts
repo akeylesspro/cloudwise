@@ -23,7 +23,16 @@ import {
 import { Timestamp } from "firebase-admin/firestore";
 
 export const parse_location = (location: Location): ParsedLocationData => {
-    const { Name: name, Images: image, Id: id, Country: country, Address: address, Latitude: lat, Longitude: lng } = location;
+    const {
+        Name: name,
+        Images: image,
+        Id: id,
+        Country: country,
+        Address: address,
+        Latitude: lat,
+        Longitude: lng,
+        OperatorName: company_name,
+    } = location;
     const res: ParsedLocationData = {
         name,
         id,
@@ -31,6 +40,7 @@ export const parse_location = (location: Location): ParsedLocationData => {
         address,
         lat,
         lng,
+        company_name,
     };
     if (image) {
         res.image = image;

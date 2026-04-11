@@ -91,12 +91,13 @@ export const service__get_location_details: Service = async (req, res) => {
             throw new Error("Location has no stations with valid statuses");
         }
 
-        const { address, lat, lng } = parsed_location;
+        const { address, lat, lng, company_name } = parsed_location;
         const { name, image = "" } = location;
         res.json(
             json_ok({
                 location: {
                     name,
+                    company_name,
                     image,
                     address,
                     lat,
