@@ -111,7 +111,7 @@ export interface ParsedStationData {
     id: string;
     status: EvseStatus;
     floor_level: string | null;
-    physical_reference: string | null;
+    reference: string | null;
     last_updated: Timestamp;
     connectors: ParsedConnectorData[];
 }
