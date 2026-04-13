@@ -84,7 +84,7 @@ export const cloudwise_request = async <T = any>(endpoint: string, payload: Reco
         const data = response.data || {};
         const { ErrorCode } = data;
         if (ErrorCode && ErrorCode > 0) {
-            throw new Error(data);
+            throw new Error(JSON.stringify(data));
         }
         return data as T;
     } catch (error: any) {

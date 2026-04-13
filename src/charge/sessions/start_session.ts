@@ -73,7 +73,7 @@ export const start_session_api = async (config: SessionCommandConfig): Promise<s
                 message: error.message || "unknown error",
             });
         }
-        return undefined;
+        throw new Error(error.message || "unknown error");
     }
 };
 
@@ -82,7 +82,7 @@ const validate_location = async (config: SessionCommandConfig) => {
     const locations: ParsedOcpiLocationData[] = cache_manager.getArrayData(`nx-charge-locations`);
     const location = locations.find((location) => location.id === config.location_id);
     if (!location) {
-        throw new Error(`start_step_2 : Location "${config.location_id}" not found`);
+        throw new Error(`start_step_2__location_not_found: location id "${config.location_id}"`);
     }
     const request = async () => await get_location_details(location.original_id, { party_id: location.party_id, car_number });
     const request_config = { retries: 3, random_delay: { min: 10, max: 20 }, name: "validate_location" };
@@ -90,14 +90,14 @@ const validate_location = async (config: SessionCommandConfig) => {
     const stations = location_details.Evses.map(parse_stations);
     const station = stations.find((station) => station.uid === config.station_uid);
     if (!station) {
-        throw new Error(`start_step_2 : Station "${config.station_uid}" not found in location "${config.location_id}"`);
-    }
-    if (station.status !== "BLOCKED" && station.status !== "PREPARING") {
-        throw new Error(`start_step_2 : Station "${config.station_uid}" is not in status "BLOCKED" or "PREPARING"`);
+        throw new Error(`start_step_2__station_not_found: station uid "${config.station_uid}", location id "${config.location_id}"`);
     }
     const connector = station.connectors.find((connector) => connector.id === config.connector_id);
     if (!connector) {
-        throw new Error(`start_step_2 : Connector "${config.connector_id}" not found in station "${config.station_uid}"`);
+        throw new Error(`start_step_2__connector_not_found: connector id "${config.connector_id}", station uid "${config.station_uid}"`);
+    }
+    if (station.status !== "BLOCKED" && station.status !== "PREPARING") {
+        throw new Error(`start_step_2__station_in_invalid_status: station uid "${config.station_uid}", status "${station.status}"`);
     }
     return { location, station, connector };
 };

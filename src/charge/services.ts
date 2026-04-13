@@ -162,7 +162,7 @@ export const service__start_session: Service = async (req, res) => {
         res.send(json_ok({ session_id }));
     } catch (error) {
         logger.error(`Error in service__start_session, car number: ${car_number}`, error);
-        res.send(json_failed({ error, config: req.body }));
+        res.send(json_failed(error));
     }
 };
 
