@@ -101,6 +101,7 @@ export const service__get_location_details: Service = async (req, res) => {
         res.json(
             json_ok({
                 location: {
+                    id,
                     name,
                     company_name,
                     image,
