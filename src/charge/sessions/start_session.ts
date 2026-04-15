@@ -56,7 +56,7 @@ export const start_session_api = async (config: SessionCommandConfig): Promise<s
         /// step 2: validate location
         const { location } = await validate_location(config);
         /// step 3: send start session command
-        session_id = await send_start_session_command(config);
+        session_id = await send_start_session_command({ ...config, location_id: location.original_id });
         /// step 4: update collections
         const { lat, lng } = location;
         await update_collections(config, { lat, lng }, car_number, session_id);
@@ -286,6 +286,7 @@ const get_start_session_config = async (charging_state_object: ChargingState): P
 
 // ------------------ start session command ------------------
 const send_start_session_command = async (command_settings: SessionCommandConfig): Promise<string> => {
+    logger.log("send_start_session_command", command_settings);
     try {
         const request = async () => await session_command(command_settings);
         const request_config = { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "send_start_session_command" };

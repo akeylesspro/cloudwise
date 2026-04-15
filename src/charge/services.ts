@@ -74,7 +74,15 @@ export const service__get_location_details: Service = async (req, res) => {
             .filter((station) => station.connector)
             .map((station) => {
                 const { id, uid, status, connector, reference } = station;
-                const { id: connector_id, standard, format, power_type, max_electric_power: max_power, price_per_kwh: price_kwh } = connector;
+                const {
+                    id: connector_id,
+                    standard,
+                    format,
+                    power_type,
+                    max_electric_power: max_power,
+                    connection_fee,
+                    price_per_kwh: price_kwh,
+                } = connector;
                 const is_cable_included = format === "CABLE";
                 return {
                     id,
@@ -87,6 +95,7 @@ export const service__get_location_details: Service = async (req, res) => {
                         cable_included: is_cable_included,
                         power_type,
                         max_power,
+                        connection_fee,
                         price_kwh,
                     },
                 };
