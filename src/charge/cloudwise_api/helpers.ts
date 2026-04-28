@@ -72,6 +72,7 @@ export const cloudwise_request = async <T = any>(endpoint: string, payload: Reco
         if (should_handle_mock(final_url, payload.car_number)) {
             return handle_mock_request(final_url, payload) as T;
         }
+        logger.log("ℹ️ Sending request to Cloudwise", { endpoint, payload });
         delete payload.car_number;
         const response = await axios.post(
             final_url,

@@ -58,18 +58,27 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
             if (debug) {
                 if (attempt > 1) {
                     logger.log(`✅ ${name} succeeded after ${attempt} attempts`);
-                }
-                else {
+                } else {
                     logger.log(`✅ ${name} succeeded on first attempt`);
                 }
             }
             return result;
         } catch (error: any) {
             last_error = error;
+
             const error_code = error?.code || error?.errno || error?.name || "";
             const should_retry = retry_on_errors_codes.length === 0 || retry_on_errors_codes.includes(error_code);
 
-            if (!should_retry || attempt === retries) {
+            if (!should_retry) {
+                if (debug) {
+                    logger.error(`❌ Retry for ${name} failed with error code ${error_code}`, last_error);
+                }
+                throw error;
+            }
+            if (attempt === retries) {
+                if (debug) {
+                    logger.error(`❌ Retry for ${name} failed after ${retries} attempts`, last_error);
+                }
                 throw error;
             }
 
@@ -85,7 +94,9 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
             }
 
             const delay_ms = delay_seconds * 1000;
-
+            if (debug) {
+                logger.error(`🟡 Retry for ${name} failed in attempt "${attempt} trying again in ${delay_seconds} seconds"`, last_error);
+            }
             await sleep(delay_ms);
         }
     }
