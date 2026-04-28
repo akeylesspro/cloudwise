@@ -1,5 +1,5 @@
 import { SessionCommandConfig } from "../cloudwise_api/types";
-import { EvseStatus, ParsedCdrItem, ParsedConnectorData, ParsedEvseData, ParsedOcpiLocationData } from "../types";
+import { EvseStatus, ParsedCdrItem, ParsedConnectorData, ParsedStationData, ParsedOcpiLocationData } from "../types";
 import type { Timestamp } from "firebase-admin/firestore";
 
 type ChargingStateOcpiStatus = "plugin" | "charging" | "plugout" | "error" | "completed" | "paid";
@@ -31,7 +31,7 @@ export interface GetLocationsByGeoAndStatusOptions {
 
 export interface ClosestUpdatedLocationResult {
     location: ParsedOcpiLocationData;
-    station: ParsedEvseData;
+    station: ParsedStationData;
     last_updated: string;
     connector: ParsedConnectorData;
 }

@@ -10,19 +10,29 @@ import {
     OcpiLocation,
     ParsedCdrItem,
     ParsedConnectorData,
-    ParsedEvseData,
+    ParsedStationData,
     ParsedLocationData,
     ParsedOcpiLocationData,
     ParsedTariffDetails,
     ParsedTariffItem,
     TariffDetails,
     TariffItem,
+    ConnectorCableSocket,
 } from "../types";
 
 import { Timestamp } from "firebase-admin/firestore";
 
 export const parse_location = (location: Location): ParsedLocationData => {
-    const { Name: name, Images: image, Id: id, Country: country, Address: address, Latitude: lat, Longitude: lng } = location;
+    const {
+        Name: name,
+        Images: image,
+        Id: id,
+        Country: country,
+        Address: address,
+        Latitude: lat,
+        Longitude: lng,
+        OperatorName: company_name,
+    } = location;
     const res: ParsedLocationData = {
         name,
         id,
@@ -30,6 +40,7 @@ export const parse_location = (location: Location): ParsedLocationData => {
         address,
         lat,
         lng,
+        company_name,
     };
     if (image) {
         res.image = image;
@@ -54,23 +65,25 @@ export const parse_ocpi_location = (location: OcpiLocation): ParsedOcpiLocationD
     return res;
 };
 
-export const parse_eves = (evse: Evse | OcpiEvse): ParsedEvseData => {
-    const { Uid: uid, Status: status, FloorLevel: floor_level, PhysicalReference: physical_reference, LastUpdated: last_updated } = evse;
+export const parse_stations = (evse: Evse | OcpiEvse): ParsedStationData => {
+    const { EvseId: id, Uid: uid, Status: status, FloorLevel: floor_level, PhysicalReference: reference, LastUpdated: last_updated } = evse;
     const connectors = "OcpiConnectors" in evse ? evse.OcpiConnectors : evse.Connectors;
 
     const connectors_data = connectors.map(parse_ocpi_connectors);
     return {
         uid,
+        id,
         status,
         floor_level,
-        physical_reference,
+        reference,
         last_updated: Timestamp.fromDate(new Date(last_updated)),
         connectors: connectors_data,
     };
 };
 
-export const parse_ocpi_eves = (evse: OcpiEvse): ParsedEvseData => {
+export const parse_ocpi_eves = (evse: OcpiEvse): ParsedStationData => {
     const {
+        EvseId: id,
         Uid: uid,
         Status: status,
         FloorLevel: floor_level,
@@ -80,10 +93,11 @@ export const parse_ocpi_eves = (evse: OcpiEvse): ParsedEvseData => {
     } = evse;
     const connectors_data = connectors.map(parse_ocpi_connectors);
     return {
+        id,
         uid,
         status,
         floor_level,
-        physical_reference,
+        reference: physical_reference,
         last_updated: Timestamp.fromDate(new Date(last_updated)),
         connectors: connectors_data,
     };

@@ -1,15 +1,18 @@
 import { Service } from "akeyless-server-commons/types";
 import { get_config, get_location_details } from "./cloudwise_api/helpers";
-import { execute_task, init_env_variables, json_failed, json_ok, TaskName } from "akeyless-server-commons/helpers";
-import { get_cdrs as get_cdrs_helper, get_distance_meters, parse_eves, parse_location } from "./helpers";
+import { json_failed, json_ok } from "akeyless-server-commons/helpers";
+import { get_cdrs as get_cdrs_helper, get_distance_meters, parse_stations, parse_location } from "./helpers";
 import { cache_manager, logger } from "akeyless-server-commons/managers";
-import { ParsedOcpiLocationData } from "./types";
+import { Evse, EvseConnectorStandard, EvseStatus, ParsedOcpiLocationData, ParsedStationData } from "./types";
 import { start_session_api, stop_session } from "./sessions";
 import { TObject } from "akeyless-types-commons";
 import { run_simulator } from "./simulator";
 import { ChargingSession } from "./sessions/types";
 import { SessionCommandConfig } from "./cloudwise_api/types";
 import { task__collect_charge_locations } from "./tasks";
+
+const relevant_statuses: EvseStatus[] = ["AVAILABLE", "PREPARING", "BLOCKED", "CHARGING"];
+const relevant_standards: EvseConnectorStandard[] = ["IEC_62196_T2", "IEC_62196_T2_COMBO"];
 
 export const service__fetch_all_locations: Service = async (req, res) => {
     try {
@@ -35,10 +38,91 @@ export const service__get_location_status: Service = async (req, res) => {
             throw new Error("Location details not found");
         }
         const parsed_location = parse_location(location_details.Location);
-        const parsed_evses = location_details.Evses.map(parse_eves);
-        res.json(json_ok({ ...parsed_location, stations: parsed_evses }));
+        const parsed_stations = location_details.Evses.map(parse_stations);
+        res.json(json_ok({ ...parsed_location, stations: parsed_stations }));
     } catch (error) {
         logger.error(`Error in service__get_location_status, location id: ${original_id}`, error);
+        res.json(json_failed(error));
+    }
+};
+
+export const service__get_location_details: Service = async (req, res) => {
+    const { id } = req.params as TObject<string>;
+    try {
+        const location: ParsedOcpiLocationData | undefined = cache_manager.getArrayData("nx-charge-locations").find((v) => v.id === id);
+        if (!location) {
+            throw new Error("Location not found");
+        }
+        const location_current_details = await get_location_details(location.original_id, { party_id: location.party_id, car_number: "" });
+        if (!location_current_details?.Location) {
+            throw new Error("Location details not found");
+        }
+        const parsed_location = parse_location(location_current_details.Location);
+        const parsed_stations: ParsedStationData[] = location_current_details.Evses.map(parse_stations);
+        const stations = parsed_stations
+            .filter((station) => relevant_statuses.includes(station.status))
+            .map((station) => {
+                const { id, uid, status, connectors, reference } = station;
+                return {
+                    id,
+                    uid,
+                    status,
+                    reference,
+                    connector: connectors[0],
+                };
+            })
+            .filter((station) => station.connector)
+            .map((station) => {
+                const { id, uid, status, connector, reference } = station;
+                const {
+                    id: connector_id,
+                    standard,
+                    format,
+                    power_type,
+                    max_electric_power: max_power,
+                    connection_fee,
+                    price_per_kwh: price_kwh,
+                } = connector;
+                const is_cable_included = format === "CABLE";
+                return {
+                    id,
+                    uid,
+                    status,
+                    reference,
+                    connector: {
+                        id: connector_id,
+                        standard,
+                        cable_included: is_cable_included,
+                        power_type,
+                        max_power,
+                        connection_fee,
+                        price_kwh,
+                    },
+                };
+            });
+
+        if (stations.length === 0) {
+            throw new Error("Location has no stations with valid statuses");
+        }
+
+        const { address, lat, lng, company_name } = parsed_location;
+        const { name, image = "" } = location;
+        res.json(
+            json_ok({
+                location: {
+                    id,
+                    name,
+                    company_name,
+                    image,
+                    address,
+                    lat,
+                    lng,
+                    stations,
+                },
+            })
+        );
+    } catch (error) {
+        logger.error(`Error in service__get_location_details, id: ${id}`, error);
         res.json(json_failed(error));
     }
 };
@@ -87,7 +171,7 @@ export const service__start_session: Service = async (req, res) => {
         res.send(json_ok({ session_id }));
     } catch (error) {
         logger.error(`Error in service__start_session, car number: ${car_number}`, error);
-        res.send(json_failed({ error, config: req.body }));
+        res.send(json_failed(error));
     }
 };
 
@@ -128,6 +212,31 @@ export const service__get_locations: Service = async (req, res) => {
                 return distance <= radius;
             });
         }
+
+        //-- keep only relevant locations
+        locations = locations
+            .map((location) => {
+                //-- keep only connectors with standards relevant to Israel.
+                location.stations = location.stations
+                    .map((station) => {
+                        station.connectors = station.connectors.filter((connector) =>
+                            relevant_standards.includes(connector.standard as EvseConnectorStandard)
+                        );
+                        return station;
+                    })
+                    .filter(
+                        (station) =>
+                            station.connectors.length > 0 &&
+                            relevant_statuses.includes(station.status) &&
+                            relevant_standards.includes(station.connectors[0].standard as EvseConnectorStandard)
+                    );
+                return location;
+            })
+            .filter((location) => {
+                const is_in_israel = location.lat >= 29.0 && location.lat <= 33.5 && location.lng >= 34.2 && location.lng <= 35.9;
+                return is_in_israel && location.stations.length > 0;
+            });
+
         locations = locations.slice(offset, offset + limit);
         res.json(json_ok({ locations }));
     } catch (error) {
