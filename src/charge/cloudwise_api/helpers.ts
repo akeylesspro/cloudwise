@@ -73,12 +73,12 @@ export const cloudwise_request = async <T = any>(endpoint: string, payload: Reco
             return handle_mock_request(final_url, payload) as T;
         }
         logger.log("ℹ️ Sending request to Cloudwise", { endpoint, payload });
-        delete payload.car_number;
+        const { car_number, ...payload_to_send } = payload;
         const response = await axios.post(
             final_url,
             {
                 FirebaseToken: token,
-                ...payload,
+                ...payload_to_send,
             },
             { timeout: (timeout_in_sec ?? 30) * 1000 }
         );
