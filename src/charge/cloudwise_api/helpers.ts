@@ -145,7 +145,7 @@ export const get_location_details = async (
     return Location;
 };
 
-export const session_command = async (config: SessionCommandConfig): Promise<SendCommandResponse> => {
+export const session_command = async (config: SessionCommandConfig, timeout_in_sec?: number): Promise<SendCommandResponse> => {
     const {
         location_id,
         party_id,
@@ -163,22 +163,26 @@ export const session_command = async (config: SessionCommandConfig): Promise<Sen
         car_number,
     } = config || {};
 
-    const data = await cloudwise_request<SendCommandResponse>("sendCommand", {
-        command,
-        LocationId: location_id,
-        PartyID: party_id,
-        CountryCode: country_code,
-        commandId: session_id,
-        evseUid: evse_uid,
-        connectorId: connector_id,
-        ignoreDistanceCheck: ignore_distance_check,
-        BleId: ble_id,
-        DeviceId: device_id,
-        AssetId: asset_id,
-        Latitude: lat,
-        Longitude: lng,
-        car_number,
-    });
+    const data = await cloudwise_request<SendCommandResponse>(
+        "sendCommand",
+        {
+            command,
+            LocationId: location_id,
+            PartyID: party_id,
+            CountryCode: country_code,
+            commandId: session_id,
+            evseUid: evse_uid,
+            connectorId: connector_id,
+            ignoreDistanceCheck: ignore_distance_check,
+            BleId: ble_id,
+            DeviceId: device_id,
+            AssetId: asset_id,
+            Latitude: lat,
+            Longitude: lng,
+            car_number,
+        },
+        timeout_in_sec
+    );
 
     return data;
 };

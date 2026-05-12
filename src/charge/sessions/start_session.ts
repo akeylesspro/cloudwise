@@ -287,7 +287,7 @@ const get_start_session_config = async (charging_state_object: ChargingState): P
 // ------------------ start session command ------------------
 const send_start_session_command = async (command_settings: SessionCommandConfig): Promise<string> => {
     try {
-        const request = async () => await session_command(command_settings);
+        const request = async () => await session_command(command_settings, 3 * 60);
         const request_config = { retries: 3, random_delay: { min: 3, max: 10 }, debug: true, name: "send_start_session_command" };
         const response = await retry(request, request_config);
         const { CommandId: session_id } = response;
