@@ -19,7 +19,7 @@ export const start_session = async (charging_state_object: ChargingState) => {
     let session_id: string | undefined;
     try {
         /// step 1: check credit balance
-        await validate_credit(car_number);
+        await validate_credit(car_number, "start_session");
         /// steps 2 & 3: get start session settings (closest location and connector)
         const command_config = await get_start_session_config(charging_state_object);
         /// step 4: send start session command
@@ -52,7 +52,7 @@ export const start_session_api = async (config: SessionCommandConfig): Promise<s
     const { car_number } = config;
     try {
         /// step 1: check credit balance
-        await validate_credit(car_number);
+        await validate_credit(car_number, "start_session_api");
         /// step 2: validate location
         const { location } = await validate_location(config);
         /// step 3: send start session command
@@ -102,8 +102,8 @@ const validate_location = async (config: SessionCommandConfig) => {
     return { location, station, connector };
 };
 
-const validate_credit = async (car_number: string) => {
-    const { is_has_balance } = await check_charge_balance(car_number);
+const validate_credit = async (car_number: string, src: string) => {
+    const { is_has_balance } = await check_charge_balance(car_number, src);
     if (!is_has_balance) {
         logger.error(`🔴 Car "${car_number}" does not have enough balance`);
         throw new Error("start_step_1__failed_to_check_car_charge_credit_balance");

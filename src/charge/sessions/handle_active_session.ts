@@ -35,7 +35,7 @@ export const handle_active_session = async (session_id: string, car_number: stri
                 return await on_session_completed(session_id, car_number, `Session status is: ${session_status}`);
             }
             /// step 2: check credit balance
-            const { is_has_balance, balance } = await check_charge_balance(car_number, cost);
+            const { is_has_balance, balance } = await check_charge_balance(car_number, "handle_active_session", cost);
             if (!is_has_balance) {
                 logger.log(`🟡 Car "${car_number}" does not have enough balance, balance: ${balance}`);
                 clear_timer();

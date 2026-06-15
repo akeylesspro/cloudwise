@@ -168,7 +168,7 @@ const charge_credit = async (car_number: string, cost: number) => {
     }
     let charge = cost;
     try {
-        const { filtered_credits: credits } = await get_car_charge_credit_balance(car_number);
+        const { filtered_credits: credits } = await get_car_charge_credit_balance(car_number, "stop_session");
 
         const single_credit = credits.find((credit) => credit.amount >= charge);
         if (single_credit) {

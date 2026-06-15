@@ -12,7 +12,7 @@ interface CreditBalance {
     all_credits: CreditItem[];
 }
 
-export const get_car_charge_credit_balance = async (car_number: string): Promise<CreditBalance> => {
+export const get_car_charge_credit_balance = async (car_number: string, src: string): Promise<CreditBalance> => {
     try {
         const token = await get_custom_fb_token();
         const end_users_url = get_nx_service_urls().end_users;
@@ -31,7 +31,7 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
                 retries: 3,
                 name: "get_car_charge_credit_balance",
                 on_retry_fn: (attempt, retries, last_error) => {
-                    logger.warn(`🟠 Retry ${attempt}/${retries} for get_car_charge_credit_balance failed`, last_error);
+                    logger.warn(`🟠 Retry ${attempt}/${retries} for get_car_charge_credit_balance failed for car "${car_number}" from "${src}"`, last_error);
                 },
                 random_delay: { min: 20, max: 40 },
             }
@@ -40,17 +40,17 @@ export const get_car_charge_credit_balance = async (car_number: string): Promise
             data: { data },
         } = response;
         const { total } = data;
-        logger.log(`⚡ Car "${car_number}" has ${total} credits balance`);
+        logger.log(`⚡ Car "${car_number}" has ${total} credits balance from "${src}"`);
         return data;
     } catch (error) {
-        logger.error("🔴 Error in get_car_charge_credit_balance", error);
+        logger.error(`🔴 Error in get_car_charge_credit_balance for car "${car_number}" from "${src}"`, error);
         return { total: 0, filtered_credits: [], all_credits: [] };
     }
 };
 
-export const check_charge_balance = async (car_number: string, cost = 0): Promise<{ is_has_balance: boolean; balance: number }> => {
+export const check_charge_balance = async (car_number: string, src: string, cost = 0): Promise<{ is_has_balance: boolean; balance: number }> => {
     const { credit_balance_threshold } = get_config();
-    const { total: balance } = await get_car_charge_credit_balance(car_number);
+    const { total: balance } = await get_car_charge_credit_balance(car_number, src);
     const required = credit_balance_threshold + cost;
     const is_has_balance = balance > required;
     return { is_has_balance, balance };

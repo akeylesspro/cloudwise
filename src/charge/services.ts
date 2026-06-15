@@ -129,6 +129,7 @@ export const service__get_location_details: Service = async (req, res) => {
 
 export const service__stop_session: Service = async (req, res) => {
     const { car_number } = req.body;
+    logger.log(`🦋 Stopping session for car: "${car_number}"`);
     const sessions: ChargingSession[] = cache_manager.getArrayData("nx-charge-sessions");
     const filter_sessions = sessions.filter((session) => session.car_number === car_number && session.status === "started");
     if (filter_sessions.length === 0) {
@@ -153,6 +154,7 @@ interface StartSessionApiOptions {
 
 export const service__start_session: Service = async (req, res) => {
     const { car_number, location_id, station_uid, connector_id } = req.body as StartSessionApiOptions;
+    logger.log(`🦋 Starting session for car: "${car_number}"`, req.body);
     try {
         const { asset_id, ble_id, device_id } = get_config();
         const config: SessionCommandConfig = {
