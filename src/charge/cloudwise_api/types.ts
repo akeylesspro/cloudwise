@@ -18,6 +18,8 @@ export type CloudwiseConfig = {
     simulator_list: string[];
 };
 
+export type CloudwiseEndpoint = "sendCommand" | "getCommandStatus" | "getUserCdrs" | "getLocations" | "getLocationDetails";
+
 export interface CloudwiseResponse {
     ErrorCode: number;
     ErrorMessage: string;

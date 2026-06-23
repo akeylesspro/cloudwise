@@ -13,6 +13,7 @@ import {
     GetCommandStatusResponse,
     UserCdrsOptions,
     UserCdrsResponse,
+    CloudwiseEndpoint,
 } from "./types";
 
 const should_handle_mock = (url: string, car_number: string): boolean => {
@@ -64,7 +65,7 @@ export const get_config = (): CloudwiseConfig => {
     return config;
 };
 
-export const cloudwise_request = async <T = any>(endpoint: string, payload: Record<string, any>, timeout_in_sec?: number): Promise<T> => {
+export const cloudwise_request = async <T = any>(endpoint: CloudwiseEndpoint, payload: Record<string, any>, timeout_in_sec?: number): Promise<T> => {
     const now = new Date().getTime();
     try {
         const { base_url, token } = get_config();
