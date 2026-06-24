@@ -8,12 +8,11 @@ import { ChargingSession } from "./sessions/types";
 import { charge_cdr } from "./sessions";
 
 export const run_tasks = async () => {
-    const env_data = init_env_variables();
+    const env_data = init_env_variables(["run_tasks"]);
     if (env_data.run_tasks == "true") {
         const hour = 60 * 60 * 1000;
-
         /// login
-        setInterval(login, 2 * hour);
+        setInterval(login, hour);
         /// collect locations
         execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
         setInterval(() => {
