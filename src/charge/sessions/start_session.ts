@@ -25,7 +25,6 @@ export const start_session = async (charging_state_object: ChargingState) => {
         /// step 4: send start session command
         session_id = await send_start_session_command(command_config);
         /// step 5: update collections
-        const { lat, lng } = charging_state_object;
         await update_collections(command_config, { lat, lng }, car_number, session_id);
         logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         if (car_number === "16457003") {
@@ -70,6 +69,7 @@ export const start_session_api = async (config: SessionCommandConfig): Promise<s
             await set_document("nx-charge-state", config.car_number, {
                 ocpi_status: "error",
                 timestamp: Timestamp.now(),
+                car_number: config.car_number,
                 message: error.message || "unknown error",
             });
         }
@@ -319,6 +319,7 @@ const update_collections = async (config: SessionCommandConfig, geo: Geo, car_nu
             ocpi_status: "charging",
             session_id,
             timestamp: Timestamp.now(),
+            car_number,
         });
     } catch (error) {
         logger.error(`🔴 Error in update_collections: ${session_id}`, JSON.stringify(error));
