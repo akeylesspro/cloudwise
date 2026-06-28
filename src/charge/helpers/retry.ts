@@ -95,7 +95,7 @@ export const retry = async <T>(fn: () => Promise<T>, options: RetryOptions): Pro
 
             const delay_ms = delay_seconds * 1000;
             if (debug) {
-                logger.error(`🟡 Retry for ${name} failed in attempt "${attempt} trying again in ${delay_seconds} seconds"`, last_error);
+                logger.warn(`🟡 Retry for ${name} failed in attempt "${attempt} trying again in ${delay_seconds} seconds"`, last_error);
             }
             await sleep(delay_ms);
         }
