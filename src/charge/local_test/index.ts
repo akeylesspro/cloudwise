@@ -34,12 +34,12 @@ export const run_local_test = async () => {
     /// login
     setInterval(login, hour);
     /// collect locations
-    schedule_request("locations", 5 * 1000, get_locations);
-    schedule_request("cdrs", 30 * 1000, async () => {
+    schedule_request("locations", 6 * 1000, get_locations);
+    schedule_request("cdrs", 15 * 1000, async () => {
         const { asset_id } = get_config();
         return get_user_cdrs({ asset_id, car_number: "test-car-number" });
     });
-    schedule_request("location_details", 15 * 1000, () =>
+    schedule_request("location_details", 8 * 1000, () =>
         get_location_details("173-SCL-IL", { party_id: "SCL", car_number: "test-car-number" })
     );
     setInterval(() => {
