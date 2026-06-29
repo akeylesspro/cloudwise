@@ -17,7 +17,7 @@ export const run_tasks = async () => {
         execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
         setInterval(() => {
             execute_task("nx-charge", TaskName.collect_charge_locations, task__collect_charge_locations);
-        }, 10 * 1000);
+        }, 10 * 60 * 1000);
         /// collect cdrs
         execute_task("nx-charge", TaskName.collect_charge_cdrs, task__collect_charge_cdrs, { debug_logs: false });
         setInterval(() => {
