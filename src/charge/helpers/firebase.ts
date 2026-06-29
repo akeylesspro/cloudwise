@@ -29,18 +29,18 @@ export const get_custom_fb_token = async (): Promise<string> => {
 
 export const initialize_snapshot = async () => {
     await snapshot_bulk_by_names(["units", "nx-charge-locations", "nx-charge-cdrs", "nx-charge-sessions"], { subscription_type: "firebase" });
-    await redis_snapshots_bulk([
-        {
-            collection_name: "nx-charge-state",
-            subscription_type: "redis",
-            on_first_time: on_snapshot_first_time,
-            on_add: handle_charging_state_snapshot,
-            on_modify: handle_charging_state_snapshot,
-            on_remove: (docs) => {
-                const prev = cache_manager.getArrayData("nx-charge-state");
-                const new_cars = prev.filter((car) => !docs.some((doc) => doc.id === car.id));
-                cache_manager.setArrayData("nx-charge-state", new_cars);
-            },
-        },
-    ]);
+    // await redis_snapshots_bulk([
+    //     {
+    //         collection_name: "nx-charge-state",
+    //         subscription_type: "redis",
+    //         on_first_time: on_snapshot_first_time,
+    //         on_add: handle_charging_state_snapshot,
+    //         on_modify: handle_charging_state_snapshot,
+    //         on_remove: (docs) => {
+    //             const prev = cache_manager.getArrayData("nx-charge-state");
+    //             const new_cars = prev.filter((car) => !docs.some((doc) => doc.id === car.id));
+    //             cache_manager.setArrayData("nx-charge-state", new_cars);
+    //         },
+    //     },
+    // ]);
 };
