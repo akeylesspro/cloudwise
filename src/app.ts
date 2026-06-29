@@ -5,6 +5,7 @@ import { run_tasks } from "./charge/tasks";
 import package_json from "../package.json";
 import { initialize_snapshot } from "./charge/helpers";
 import { login } from "./charge/cloudwise_api/helpers";
+import { run_local_test } from "./charge/local_test";
 
 const init = async () => {
     const version = package_json.version;
@@ -15,7 +16,8 @@ const init = async () => {
     });
     await login();
     await initialize_snapshot();
-    await run_tasks();
+    // await run_tasks();
+    await run_local_test();
 };
 
 init().catch((e) => {
