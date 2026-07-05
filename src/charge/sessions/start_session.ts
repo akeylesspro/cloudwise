@@ -58,6 +58,7 @@ export const start_session_api = async (config: SessionCommandConfig): Promise<s
         session_id = await send_start_session_command({ ...config, location_id: location.original_id });
         /// step 4: update collections
         const { lat, lng } = location;
+        logger.log(`🟢 Session "${session_id}" started for car: "${car_number}"`);
         await update_collections(config, { lat, lng }, car_number, session_id);
         return session_id;
     } catch (error: any) {

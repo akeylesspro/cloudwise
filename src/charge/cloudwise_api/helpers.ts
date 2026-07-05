@@ -1,5 +1,5 @@
 import { cache_manager, logger } from "akeyless-server-commons/managers";
-import axios, { AxiosRequestConfig } from "axios";
+import axios from "axios";
 import { mock_get_command_status, mock_get_location_details, mock_get_user_cdrs, mock_send_command } from "../simulator/mock_store";
 import {
     CloudwiseConfig,
@@ -91,7 +91,26 @@ export const cloudwise_request = async <T = any>(endpoint: CloudwiseEndpoint, pa
         return data as T;
     } catch (error: any) {
         const duration = new Date().getTime() - now;
-        logger.error(`❌ cloudwise_request error: "${endpoint}" (${duration}ms), payload: ${JSON.stringify(payload)}`, error);
+        const req = error?.request;
+        const sock = req?.socket;
+        const diag = {
+            endpoint,
+            duration_ms: duration,
+            error_code: error?.code || error?.name,
+            error_message: error?.message,
+            reused_socket: req?.reusedSocket ?? null,
+            remote_ip: sock?.remoteAddress ?? null,
+            remote_port: sock?.remotePort ?? null,
+            bytes_written: sock?.bytesWritten ?? null,
+            bytes_read: sock?.bytesRead ?? null,
+            response_status: error?.response?.status ?? req?.res?.statusCode ?? null,
+        };
+        logger.error(
+            `❌ cloudwise_request error: "${endpoint}" (${duration}ms), payload: ${JSON.stringify(payload)}, 🔬 CLOUDWISE_DIAG ${JSON.stringify(
+                diag
+            )}`,
+            error
+        );
         throw error;
     }
 };

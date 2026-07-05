@@ -35,7 +35,7 @@ export const stop_session = async (session_id: string, options: StopSessionPaylo
         await update_collections(session, message, final_status);
         /// step 5: async update session and cdr (if exists)
         get_session_cdr(session);
-        logger.log(`⛔ Session "${session.id}" operation completed successfully`);
+        logger.log(`⛔ Session "${session.id}" operation completed successfully with message: "${message}"`);
     } catch (error) {
         logger.error(`🔴 Error in stop session: ${session_id}`, JSON.stringify(error));
     }
@@ -134,7 +134,7 @@ const get_session_cdr = (session: ChargingSession) => {
 const charge_session = async (session: ChargingSession): Promise<boolean> => {
     const { car_number, cost = 0 } = session;
     if (cost === 0) {
-        logger.log(`🔴 Session "${session.id}" cost is 0, skipping charge`);
+        logger.log(`ℹ️ Session "${session.id}" cost is 0, skipping charge`);
         return true;
     }
     try {
