@@ -12,6 +12,10 @@ const init = async () => {
         init_snapshot_options: {
             subscription_type: "redis",
         },
+        log_requests: {
+            url: true,
+            body: true,
+        },
     });
     await login();
     await initialize_snapshot();
