@@ -201,7 +201,7 @@ interface GetLocationsOptions {
 export const service__get_locations: Service = async (req, res) => {
     const { limit = 9999, offset = 0, radius = 1000 * 10, lat, lng, operator_name, id } = req.body as GetLocationsOptions;
     try {
-        let locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("nx-charge-locations");
+        let locations: ParsedOcpiLocationData[] = cache_manager.getArrayData("nx-charge-locations").filter((location) => location.party_id !== "EDG");
         if (operator_name) {
             locations = locations.filter((location) => location.company_name.toLowerCase() === operator_name.toLowerCase());
         }
